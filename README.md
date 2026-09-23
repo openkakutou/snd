@@ -3,13 +3,14 @@
 A read/write Go library for MUGEN/Ikemen GO sound (`.snd`) files — v1 and v2 parsing and decoding to raw PCM — a shared dependency of the [OpenKakutou](https://github.com/openkakutou) project, needed independently by [`character`](https://github.com/openkakutou/character) (a character's own sounds) and [`mode-quick-versus`](https://github.com/openkakutou/mode-quick-versus) (system/common sound sets). No playback dependency; compiles to WebAssembly.
 
 <!-- vibe:begin:features -->
-This project is in early-stage development — no functionality yet, see the roadmap's decision `026-scope-org-wide-audio-snd-and-bgm-support` for the scoping.
+- Read a `.snd` v1 sound file's header and sound table, addressed the same way a character's own sound-triggering controller addresses sounds
+- Decode each sound's embedded audio to raw PCM samples, ready to play back
+- Malformed or truncated sound data is reported with a clear error naming the affected sound, never a crash or silently wrong audio
+- Validated against real, unmodified community `.snd` files, not just hand-built test data
 
-Planned:
+Planned, see the roadmap's decision `026-scope-org-wide-audio-snd-and-bgm-support` for the scoping:
 
-- Reading `.snd` v1 sound files (header, sound table, PCM/ADPCM sample decode)
 - Reading `.snd` v2 sound files (sound table, embedded samples, and Ikemen GO's external-audio-file-reference extension)
-- Decoding samples to raw PCM
 - A WebAssembly build so web apps can decode sounds without a Go toolchain
 <!-- vibe:end:features -->
 
@@ -34,23 +35,45 @@ go get -u github.com/openkakutou/snd
 <!-- vibe:end:install -->
 
 <!-- vibe:begin:usage -->
-No functionality is implemented yet — the parsing/decoding API will be documented here as it lands. For now the package only exposes its version:
+Open a `.snd` v1 file, read its sound table, and decode a sound to raw PCM by its `(group, sample)` key:
 
 ```go
 package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/openkakutou/snd"
 )
 
 func main() {
-	fmt.Println(snd.Version)
+	f, err := os.Open("fighter.snd")
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+
+	table, err := snd.ParseV1(f)
+	if err != nil {
+		panic(err)
+	}
+
+	sound, err := snd.DecodeV1Sound(f, table, 0, 0) // group 0, sample 0
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("decoded %d samples at %d Hz, %d channel(s)\n",
+		len(sound.PCM), sound.SampleRate, sound.Channels)
 }
 ```
+
+`.snd` v2 files are not supported yet. ADPCM-encoded sounds are out of
+scope by design — see the documentation index below for details.
 <!-- vibe:end:usage -->
 
 <!-- vibe:begin:docs-index -->
-No additional documentation yet.
+- [`docs/api.md`](docs/api.md) — the public API for reading `.snd` v1 files and decoding sounds to PCM
+- [`docs/testing.md`](docs/testing.md) — the kinds of tests in this repo and how to run and regenerate them
 <!-- vibe:end:docs-index -->
