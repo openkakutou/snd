@@ -11,13 +11,16 @@ go test ./...
 ## Kinds of tests
 
 - **Synthetic unit tests** (`v1_test.go`, `v1_decoder_test.go`, `v2_test.go`,
-  `v2_decoder_test.go`, `v2_external_test.go`) — build minimal `.snd` v1/v2
-  files and WAV blobs in memory to cover the nominal path, edge cases
-  (unknown `(group, sample)`, non-RIFF/WAVE data, unsupported format tags
-  and bit depths, an external reference with no opener, a not-found or
-  unsupported-format external file, corrupt data that must not be
-  misread as a path), and error paths (bad signature, truncated sound
-  table, truncated sample data) without needing any file on disk.
+  `v2_decoder_test.go`, `v2_external_test.go`, `decode_test.go`) — build
+  minimal `.snd` v1/v2 files and WAV blobs in memory to cover the nominal
+  path, edge cases (unknown `(group, sample)`, non-RIFF/WAVE data,
+  unsupported format tags and bit depths, an external reference with no
+  opener, a not-found or unsupported-format external file, corrupt data
+  that must not be misread as a path), and error paths (bad signature,
+  truncated sound table, truncated header, truncated sample data) without
+  needing any file on disk. `decode_test.go` additionally proves
+  `DecodeSound` picks the right version-specific path for both a
+  synthetic v1 and a synthetic v2 file.
 - **Real-fixture tests** (`v1_fixtures_test.go`, `v2_fixtures_test.go`) —
   decode real, trimmed `.snd` v1/v2 fixtures under `testdata/files/`. The
   v1 fixtures' expected values are independently derived with Python's
@@ -27,7 +30,12 @@ go test ./...
   hand-built data. The v2 external-file-reference fixture test also
   performs a real `os.ReadFile` through the public `ExternalAudioOpener`
   callback, exercising the same code path a real consumer would use, not
-  just an in-memory stub.
+  just an in-memory stub. `decode_test.go` runs the same real fixtures
+  through `DecodeSound` too, confirming it auto-detects each one's version
+  correctly.
+- **WASM smoke test** (`cmd/wasm/smoke.mjs`) — not run by `go test`, since
+  `syscall/js` code cannot run under the plain Go toolchain. See
+  [docs/wasm.md](wasm.md#verifying-a-build).
 
 ## Regenerating fixtures
 

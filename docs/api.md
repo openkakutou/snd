@@ -183,3 +183,32 @@ when relevant):
   supported — see decision `003`)
 - any of `DecodeV1Sound`'s own embedded-audio error cases (bad RIFF/WAVE,
   missing chunks, unsupported format tag or bit depth)
+
+## Version-agnostic decode
+
+### `DecodeSound`
+
+```go
+func DecodeSound(r io.ReaderAt, group, sample int, openExternal ExternalAudioOpener) (*DecodedSound, error)
+```
+
+Reads a `.snd` file from `r` — v1 or v2, auto-detected from the file's own
+header, the same way a caller no longer has to choose between `ParseV1`
+and `ParseV2` themselves — and decodes the sound keyed by
+`(group, sample)`. `openExternal` is passed straight through to
+`DecodeV2Sound` when `r` turns out to hold a v2 file with an
+external-file-reference entry; it is simply ignored for a v1 file, which
+has no such extension.
+
+This is the function `cmd/wasm`'s JS entrypoint (see
+[docs/wasm.md](wasm.md)) exposes, so a JS caller doesn't need to detect the
+version itself either — but it is equally usable from native Go code as a
+convenience over calling `ParseV1`/`ParseV2` and the matching decode
+function directly.
+
+**Errors:** the same as `ParseV1`/`ParseV2` and `DecodeV1Sound`/
+`DecodeV2Sound` — a bad signature, a truncated header, or any of the
+version-specific decode errors documented above for whichever version was
+detected. See
+[`.vibe/decisions/004-wasm-entrypoint-api-shape-and-version-detection.md`](../.vibe/decisions/004-wasm-entrypoint-api-shape-and-version-detection.md)
+for how version detection itself works.

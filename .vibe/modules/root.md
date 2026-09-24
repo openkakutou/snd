@@ -2,9 +2,13 @@
 
 **Role:** MUGEN/Ikemen GO `.snd` v1 and v2 read paths — parses a file's
 header and sound table, and decodes each entry's audio to raw PCM,
-including a v2 entry's Ikemen GO external-file-reference extension.
+including a v2 entry's Ikemen GO external-file-reference extension. Also
+exposes a version-agnostic decode call (backlog item 003) that auto-detects
+v1 vs v2 itself, the entry point `cmd/wasm` (see `modules/wasm.md`) builds
+on.
 
-**Files:** `version.go`, `v1.go`, `v1_decoder.go`, `v2.go`, `v2_decoder.go`
+**Files:** `version.go`, `v1.go`, `v1_decoder.go`, `v2.go`, `v2_decoder.go`,
+`decode.go`
 
 **Exports:**
 - `Version` (string constant)
@@ -16,6 +20,7 @@ including a v2 entry's Ikemen GO external-file-reference extension.
 - `DecodeV2Sound(r io.ReaderAt, table *V2SoundTable, group, sample int, openExternal ExternalAudioOpener) (*DecodedSound, error)`
 - `ExternalAudioOpener` (`func(path string) ([]byte, error)`)
 - `DecodedSound` (shared by both v1 and v2 decode)
+- `DecodeSound(r io.ReaderAt, group, sample int, openExternal ExternalAudioOpener) (*DecodedSound, error)` — auto-detects v1 vs v2 from the file's header (`header[12] == 2` signals v2, mirroring `sff.Load`'s own auto-detection technique at a different byte offset — see `.vibe/decisions/004-wasm-entrypoint-api-shape-and-version-detection.md`) and dispatches to the matching `ParseV*`+`Decode*Sound` pair; `openExternal` is ignored for a v1 file
 
 **Depends on:** nothing internal yet — stdlib only (`encoding/binary`, `io`,
 `errors`, `fmt`, `path/filepath`, `strings`).

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A `.snd` sound can now be decoded without knowing ahead of time whether the file is v1 or v2 — the version is auto-detected the same way the file format's other tooling already does. This is also what powers a new WebAssembly build (`snd.wasm` + `wasm_exec.js`): any JS host (a browser, a game engine's scripting layer) can decode a sound directly, with no Go toolchain of its own, including resolving a v2 sound's external-audio-file extension via a caller-supplied callback. A GitHub Actions workflow publishes both files as release assets on every tagged release, gated on a real smoke test of the built artifact.
+
 ## [0.2.0] - 2026-09-24
 
 ### Added
