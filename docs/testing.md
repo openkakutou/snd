@@ -10,24 +10,33 @@ go test ./...
 
 ## Kinds of tests
 
-- **Synthetic unit tests** (`v1_test.go`, `v1_decoder_test.go`) — build
-  minimal `.snd` v1 files and WAV blobs in memory to cover the nominal
-  path, edge cases (unknown `(group, sample)`, non-RIFF/WAVE data,
-  unsupported format tags and bit depths), and error paths (bad signature,
-  truncated sound table, truncated sample data) without needing any file
-  on disk.
-- **Real-fixture tests** (`v1_fixtures_test.go`) — decode real, trimmed
-  `.snd` v1 fixtures under `testdata/files/` and check the result against
-  values independently derived with Python's standard-library `wave`
-  module reading the exact same embedded audio bytes, not with this
-  package's own decoder. This is what actually validates the decoder
-  against real-world files rather than only hand-built data.
+- **Synthetic unit tests** (`v1_test.go`, `v1_decoder_test.go`, `v2_test.go`,
+  `v2_decoder_test.go`, `v2_external_test.go`) — build minimal `.snd` v1/v2
+  files and WAV blobs in memory to cover the nominal path, edge cases
+  (unknown `(group, sample)`, non-RIFF/WAVE data, unsupported format tags
+  and bit depths, an external reference with no opener, a not-found or
+  unsupported-format external file, corrupt data that must not be
+  misread as a path), and error paths (bad signature, truncated sound
+  table, truncated sample data) without needing any file on disk.
+- **Real-fixture tests** (`v1_fixtures_test.go`, `v2_fixtures_test.go`) —
+  decode real, trimmed `.snd` v1/v2 fixtures under `testdata/files/`. The
+  v1 fixtures' expected values are independently derived with Python's
+  standard-library `wave` module reading the exact same embedded audio
+  bytes, not with this package's own decoder — this is what actually
+  validates the decoder against real-world files rather than only
+  hand-built data. The v2 external-file-reference fixture test also
+  performs a real `os.ReadFile` through the public `ExternalAudioOpener`
+  callback, exercising the same code path a real consumer would use, not
+  just an in-memory stub.
 
 ## Regenerating fixtures
 
 `testdata/files/*.snd` are trimmed from real character files on a local,
 machine-specific corpus (never referenced by path from code or tests — see
-`.vibe/fixture-sources.md`). To regenerate them:
+`.vibe/fixture-sources.md`). `v2-external-ref.snd` is the one exception —
+hand-built, not trimmed from any real file (see `testdata/README.md`), since
+no real character using Ikemen GO's external-file-reference extension could
+be found. To regenerate the trimmed fixtures:
 
 ```sh
 SRC_DIR=/path/to/chars go run ./testdata/gen

@@ -3,14 +3,14 @@
 A read/write Go library for MUGEN/Ikemen GO sound (`.snd`) files — v1 and v2 parsing and decoding to raw PCM — a shared dependency of the [OpenKakutou](https://github.com/openkakutou) project, needed independently by [`character`](https://github.com/openkakutou/character) (a character's own sounds) and [`mode-quick-versus`](https://github.com/openkakutou/mode-quick-versus) (system/common sound sets). No playback dependency; compiles to WebAssembly.
 
 <!-- vibe:begin:features -->
-- Read a `.snd` v1 sound file's header and sound table, addressed the same way a character's own sound-triggering controller addresses sounds
+- Read a `.snd` v1 or v2 sound file's header and sound table, addressed the same way a character's own sound-triggering controller addresses sounds
 - Decode each sound's embedded audio to raw PCM samples, ready to play back
-- Malformed or truncated sound data is reported with a clear error naming the affected sound, never a crash or silently wrong audio
+- A v2 sound can also point at an external audio file instead of embedding its samples (Ikemen GO's own extension) — resolving and decoding it works the same way, from the caller's perspective, as an embedded sound
+- Malformed or truncated sound data, or a missing/invalid external audio file, is reported with a clear error naming the affected sound, never a crash or silently wrong audio
 - Validated against real, unmodified community `.snd` files, not just hand-built test data
 
 Planned, see the roadmap's decision `026-scope-org-wide-audio-snd-and-bgm-support` for the scoping:
 
-- Reading `.snd` v2 sound files (sound table, embedded samples, and Ikemen GO's external-audio-file-reference extension)
 - A WebAssembly build so web apps can decode sounds without a Go toolchain
 <!-- vibe:end:features -->
 
@@ -69,11 +69,22 @@ func main() {
 }
 ```
 
-`.snd` v2 files are not supported yet. ADPCM-encoded sounds are out of
-scope by design — see the documentation index below for details.
+For a `.snd` v2 file, use `snd.ParseV2` and `snd.DecodeV2Sound` instead. A v2
+sound may point at an external audio file instead of embedding its samples;
+pass a function that resolves that file's path to its bytes however your
+own application does (`nil` if you know the file has no such sounds):
+
+```go
+sound, err := snd.DecodeV2Sound(f, table, 0, 0, func(path string) ([]byte, error) {
+	return os.ReadFile(path) // or fetch it however your app stores assets
+})
+```
+
+ADPCM-encoded sounds, and an external file in a format other than WAV/PCM,
+are out of scope by design — see the documentation index below for details.
 <!-- vibe:end:usage -->
 
 <!-- vibe:begin:docs-index -->
-- [`docs/api.md`](docs/api.md) — the public API for reading `.snd` v1 files and decoding sounds to PCM
+- [`docs/api.md`](docs/api.md) — the public API for reading `.snd` v1 and v2 files and decoding sounds to PCM, including external audio files
 - [`docs/testing.md`](docs/testing.md) — the kinds of tests in this repo and how to run and regenerate them
 <!-- vibe:end:docs-index -->

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Read a `.snd` v2 file's header and sound table, keyed by `(group, sample)`, and decode each entry's embedded audio to raw PCM samples, the same as v1. A v2 entry can also use Ikemen GO's own extension letting it point at an external audio file instead of embedding samples: given a caller-supplied opener for resolving that file's bytes (this library never touches the filesystem or network itself, to stay usable from a browser), the referenced file's audio decodes exactly like an embedded entry. A missing, unresolvable, or unsupported-format external file returns a descriptive error naming the entry and the path, never a panic or silent empty audio. Validated against a real, unmodified community `.snd` file; no real character using the external-file-reference extension could be found, so that case is validated against a clearly-marked synthetic reference pointing at real, unmodified audio instead.
+
 ## [0.1.0] - 2026-09-23
 
 ### Added

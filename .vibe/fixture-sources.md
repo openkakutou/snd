@@ -56,3 +56,50 @@ from two real files in the corpus above via `testdata/gen`:
 Both entries' embedded WAV bytes are copied verbatim; only the
 surrounding container (header, sound table) is rebuilt to keep the
 fixture small. See `testdata/README.md`.
+
+## Corpus scan results (backlog item 002, run 2026-09-24)
+
+A byte-level scan of the same local corpus for `.snd` v2 support (real
+files' 4-byte header version fields, run over all 496 parseable files):
+**zero files declare version 2** in the conventional sense — every real
+file's version tuple is one of `(1,1)`, `(4,0)`, or `(256,256)` (the latter
+two both being byte-order variants of "version 1.1", a known MUGEN-tooling
+quirk), never `2`. Ikemen GO's own reference loader (`src/sound.go`) applies
+the same parsing regardless of this field's value, so this is consistent
+with the field being largely decorative rather than a genuine format
+discriminator in real-world files.
+
+A targeted byte-level check of individual real subheaders (60 files,
+6,509 entries) found the true Group/Sample layout: both are 4-byte
+little-endian signed integers filling the entire 16-byte subheader, with
+nothing reserved — not v1's shipped 2-byte-plus-4-reserved-bytes reading.
+This matches Ikemen GO's own reference parser exactly and is the basis for
+`ParseV2`'s subheader layout; see
+`.vibe/decisions/002-v2-subheader-uses-4-byte-group-and-sample-fields.md`
+for the full evidence and its implication for the already-shipped v1 path
+(tracked as backlog item `004`).
+
+No file in the corpus contains an entry using Ikemen GO's
+external-file-reference extension (an entry whose payload is a path rather
+than embedded audio) — see
+`.vibe/decisions/003-v2-external-file-reference-detection-and-resolution.md`
+for the resulting accepted validation gap, mirroring `sff`'s own precedent
+for RLE5 (its decision `014`).
+
+`testdata/files/v2-basic.snd` is trimmed from a real file the same way as
+the v1 fixtures above, using v2's own subheader layout to locate the entry:
+
+- `v2-basic.snd` ← `Misc/Popeye/popeye.snd`, entry (group 1, sample 143): a
+  real 8-bit mono clip, 8000 Hz. Only the header's version stamp is
+  synthesized (no real file declares version 2 — see above); the
+  sound-table bytes and audio are real.
+
+`testdata/files/v2-external-audio.wav` is real, unmodified audio trimmed the
+same way, saved standalone (not wrapped in a `.snd` container) since it is
+what an external-file-reference entry resolves to:
+
+- `v2-external-audio.wav` ← `City Hunter/Ryo Saeba/RS.snd`, entry (group 0,
+  sample 0): a real 8-bit mono clip, 8000 Hz.
+
+`testdata/files/v2-external-ref.snd` is hand-built, not trimmed from any
+real file — see `testdata/README.md` for what it contains and why.

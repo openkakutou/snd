@@ -51,8 +51,18 @@ func DecodeV1Sound(r io.ReaderAt, table *V1SoundTable, group, sample int) (*Deco
 // signed 16-bit PCM, guided by its "fmt " chunk. group and sample are only
 // used to name the offending entry in error messages.
 func decodeWAVPCM(blob []byte, group, sample int) (*DecodedSound, error) {
+	return decodeWAVPCMWithContext(blob, fmt.Sprintf("sound (group %d, sample %d)", group, sample))
+}
+
+// decodeWAVPCMWithContext is decodeWAVPCM's shared core: context is
+// prepended to every error message ("snd: <context>: ...") so callers other
+// than DecodeV1Sound — namely DecodeV2Sound, for both an entry's embedded
+// audio and an Ikemen GO external-file-reference entry's resolved audio —
+// can name themselves precisely (e.g. including the external file's path)
+// without duplicating this RIFF/WAVE parsing logic.
+func decodeWAVPCMWithContext(blob []byte, context string) (*DecodedSound, error) {
 	if len(blob) < 12 || string(blob[0:4]) != "RIFF" || string(blob[8:12]) != "WAVE" {
-		return nil, fmt.Errorf("snd: sound (group %d, sample %d): audio data is not a valid RIFF/WAVE blob", group, sample)
+		return nil, fmt.Errorf("snd: %s: audio data is not a valid RIFF/WAVE blob", context)
 	}
 
 	var fmtChunk, dataChunk []byte
@@ -62,7 +72,7 @@ func decodeWAVPCM(blob []byte, group, sample int) (*DecodedSound, error) {
 		size := int(binary.LittleEndian.Uint32(blob[pos+4 : pos+8]))
 		pos += 8
 		if size < 0 || pos+size > len(blob) {
-			return nil, fmt.Errorf("snd: sound (group %d, sample %d): truncated %q chunk", group, sample, id)
+			return nil, fmt.Errorf("snd: %s: truncated %q chunk", context, id)
 		}
 		switch id {
 		case "fmt ":
@@ -77,13 +87,13 @@ func decodeWAVPCM(blob []byte, group, sample int) (*DecodedSound, error) {
 	}
 
 	if fmtChunk == nil {
-		return nil, fmt.Errorf("snd: sound (group %d, sample %d): missing fmt chunk", group, sample)
+		return nil, fmt.Errorf("snd: %s: missing fmt chunk", context)
 	}
 	if len(fmtChunk) < 16 {
-		return nil, fmt.Errorf("snd: sound (group %d, sample %d): fmt chunk too short (%d bytes)", group, sample, len(fmtChunk))
+		return nil, fmt.Errorf("snd: %s: fmt chunk too short (%d bytes)", context, len(fmtChunk))
 	}
 	if dataChunk == nil {
-		return nil, fmt.Errorf("snd: sound (group %d, sample %d): missing data chunk", group, sample)
+		return nil, fmt.Errorf("snd: %s: missing data chunk", context)
 	}
 
 	formatTag := binary.LittleEndian.Uint16(fmtChunk[0:2])
@@ -92,10 +102,10 @@ func decodeWAVPCM(blob []byte, group, sample int) (*DecodedSound, error) {
 	bitsPerSample := int(binary.LittleEndian.Uint16(fmtChunk[14:16]))
 
 	if formatTag != pcmFormatTag {
-		return nil, fmt.Errorf("snd: sound (group %d, sample %d): unsupported WAVE format tag %d (only PCM is supported)", group, sample, formatTag)
+		return nil, fmt.Errorf("snd: %s: unsupported WAVE format tag %d (only PCM is supported)", context, formatTag)
 	}
 	if channels <= 0 {
-		return nil, fmt.Errorf("snd: sound (group %d, sample %d): invalid channel count %d", group, sample, channels)
+		return nil, fmt.Errorf("snd: %s: invalid channel count %d", context, channels)
 	}
 
 	var pcm []int16
@@ -109,14 +119,14 @@ func decodeWAVPCM(blob []byte, group, sample int) (*DecodedSound, error) {
 		}
 	case 16:
 		if len(dataChunk)%2 != 0 {
-			return nil, fmt.Errorf("snd: sound (group %d, sample %d): truncated 16-bit sample data (%d bytes, not a multiple of 2)", group, sample, len(dataChunk))
+			return nil, fmt.Errorf("snd: %s: truncated 16-bit sample data (%d bytes, not a multiple of 2)", context, len(dataChunk))
 		}
 		pcm = make([]int16, len(dataChunk)/2)
 		for i := range pcm {
 			pcm[i] = int16(binary.LittleEndian.Uint16(dataChunk[i*2 : i*2+2]))
 		}
 	default:
-		return nil, fmt.Errorf("snd: sound (group %d, sample %d): unsupported bit depth %d (only 8-bit and 16-bit PCM are supported)", group, sample, bitsPerSample)
+		return nil, fmt.Errorf("snd: %s: unsupported bit depth %d (only 8-bit and 16-bit PCM are supported)", context, bitsPerSample)
 	}
 
 	return &DecodedSound{
