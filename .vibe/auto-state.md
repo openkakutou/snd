@@ -1,9 +1,7 @@
 ---
-status: running
+status: idle
 started: 2026-09-25T03:23
 limit: 1
-current: 004
-attempt: 1
 ---
 # Auto run journal
 
@@ -17,4 +15,4 @@ attempt: 1
 - 003 — feature — done (529c18c)
 
 ## 2026-09-25T03:23 — run started (limit: 1, via /vibe:next-task auto 1)
-- 004 — fix — start
+- 004 — fix — done (dc03540, closed fc89467)
