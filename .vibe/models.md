@@ -47,9 +47,10 @@ Defined in: `v2.go`
 | Sample | int | Sound's sample index within Group |
 | Offset | int64 | Absolute file offset of the entry's payload (embedded audio, or an external-file-reference path) |
 | Length | int | Length of that payload, in bytes |
-Defined in: `v2.go`. Unlike `V1SoundEntry`, `Group`/`Sample` are read from a
-4-byte on-disk field each, not 2 — see
-`.vibe/decisions/002-v2-subheader-uses-4-byte-group-and-sample-fields.md`.
+Defined in: `v2.go`. Same on-disk subheader layout as `V1SoundEntry`:
+`Group`/`Sample` are each a 4-byte field — see
+`.vibe/decisions/002-v2-subheader-uses-4-byte-group-and-sample-fields.md` and
+`.vibe/decisions/005-v1-group-sample-fields-are-4-bytes-not-2.md`.
 
 ## V2SoundTable
 | Field | Type | Notes |

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed reading a `.snd` v1 file's sound index: most sounds sharing a group with more than a couple of samples were being read under the wrong sample number, silently colliding several distinct sounds onto the same index. Confirmed against a large corpus of real character files (99.8% of files, 72% of sound entries affected) and fixed to match how real files actually store this data.
+
 ## [0.3.0] - 2026-09-24
 
 ### Added

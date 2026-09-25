@@ -103,3 +103,21 @@ what an external-file-reference entry resolves to:
 
 `testdata/files/v2-external-ref.snd` is hand-built, not trimmed from any
 real file — see `testdata/README.md` for what it contains and why.
+
+## Corpus scan results (backlog item 004, run 2026-09-25)
+
+A byte-level scan of the full local corpus (483 files that parse as a v1
+header) comparing `ParseV1`'s shipped 2-byte Group/Sample reading against
+the corrected 4-byte reading, at the level of every individual sound entry:
+**482 of 483 files (99.8%) have at least one entry that the 2-byte reading
+gets wrong**, and **38,093 of 52,758 entries (72.2%) get a wrong
+(Group, Sample) key** — not the rare/inconsequential case that would have
+justified downgrading this item. See
+`.vibe/decisions/005-v1-group-sample-fields-are-4-bytes-not-2.md` for the
+decision this evidence supports and the fix it describes.
+
+`testdata/files/v1-multidigit-sample.snd` is trimmed from the same real
+file `v2-basic.snd` uses (`Misc/Popeye/popeye.snd`, entry group 1, sample
+143), this time keeping that file's own real v1 header version stamp
+instead of synthesizing a v2 one — no synthesizing needed, since the
+underlying entry bytes are identical either way (see decision `005`).

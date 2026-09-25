@@ -12,9 +12,11 @@ entries); the source files these are trimmed from are not vendored into
 this repository. Each fixture here was produced from a real source file by
 `gen/main.go`, a standalone regeneration tool (not part of the `snd`
 package's public API): it locates the exact `(group, sample)` entry a test
-needs (via `ParseV1`), copies that entry's real embedded audio bytes
-verbatim, and writes a minimal valid `.snd` file containing just that
-entry.
+needs (via `ParseV2`, since a v1 and a v2 file's subheader bytes are
+identical in shape — see decision `005`), copies that entry's real embedded
+audio bytes verbatim, and writes a minimal valid `.snd` file containing
+just that entry, with whichever header version stamp the scenario calls
+for.
 
 No audio *content* is invented — every embedded byte is copied from a real
 upstream file. Only the surrounding container (header, sound table) is
@@ -30,8 +32,16 @@ authored by the trimming tool, to keep the fixture small.
   stamp is synthesized** (set to `2,0,0,0`) — no file in the available
   corpus declares itself version 2 in the conventional sense; see
   `.vibe/decisions/002-v2-subheader-uses-4-byte-group-and-sample-fields.md`.
-  Sample 143 is deliberately real: it is exactly the kind of value v1's own
-  2-byte Sample field cannot represent correctly.
+  Sample 143 is deliberately real: it is exactly the kind of value
+  `ParseV1`'s previously-shipped 2-byte Sample field could not represent
+  correctly (see `v1-multidigit-sample.snd` below).
+- `v1-multidigit-sample.snd` — the same real entry as `v2-basic.snd` above
+  (group 1, sample 143, from `Misc/Popeye/popeye.snd`), but under that
+  file's own, genuinely real v1 header (no synthesized version stamp
+  needed this time). Demonstrates backlog item 004's fix: `ParseV1` now
+  reads Group and Sample as 4-byte fields, the same as `ParseV2`, since
+  that is how real files actually store them — see
+  `.vibe/decisions/005-v1-group-sample-fields-are-4-bytes-not-2.md`.
 
 **`v2-external-ref.snd` and `v2-external-audio.wav` are a different kind of
 fixture — clearly-marked synthetic, not trimmed from a real file.** No real

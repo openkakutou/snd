@@ -75,6 +75,22 @@ func main() {
 			},
 		},
 		{
+			// Real audio, real sound-table bytes, and a genuinely real v1
+			// header version stamp — no synthesizing needed here, unlike
+			// v2-basic.snd (see .vibe/decisions/005-v1-group-sample-fields-are-4-bytes-not-2.md).
+			// (group 1, sample 143) is a real entry whose Sample value does
+			// not fit in ParseV1's previously-shipped 2-byte Sample field
+			// (it would have silently read as Sample 0) — this fixture
+			// demonstrates the corrected 4-byte reading against a real v1
+			// file.
+			name:    "v1-multidigit-sample.snd",
+			src:     "Misc/Popeye/popeye.snd",
+			version: 1,
+			entries: []entryRef{
+				{group: 1, sample: 143}, // real 8-bit mono clip
+			},
+		},
+		{
 			// Real audio, real sound-table bytes — only the version stamp is
 			// synthesized (no real file in the available corpus declares
 			// itself version 2; see
@@ -205,44 +221,34 @@ func extractRaw(data []byte, ex rawAudioExtract) ([]byte, error) {
 	return data[offset : offset+int64(length)], nil
 }
 
-// locate finds ref's (group, sample) entry in a real .snd file's own bytes,
-// using either v1's or v2's subheader layout depending on version, and
-// returns its exact (group, sample, offset, length).
+// locate finds ref's (group, sample) entry in a real .snd file's own bytes.
+// The subheader's physical layout (4-byte Group/Sample fields) is the same
+// regardless of the file's declared version — real files, Ikemen GO's own
+// reference loader, and this repo's ParseV1/ParseV2 all agree on this (see
+// .vibe/decisions/005-v1-group-sample-fields-are-4-bytes-not-2.md) — so
+// locating always goes through ParseV2, whatever scenario.version says;
+// version only controls the header's own version stamp, written separately
+// in trim/trimSynthetic.
 func locate(data []byte, version int, ref entryRef) (group, sample int, offset int64, length int, err error) {
-	switch version {
-	case 1:
-		table, err := snd.ParseV1(readerAt(data))
-		if err != nil {
-			return 0, 0, 0, 0, err
-		}
-		i, ok := table.Index(ref.group, ref.sample)
-		if !ok {
-			return 0, 0, 0, 0, fmt.Errorf("(group %d, sample %d) not found", ref.group, ref.sample)
-		}
-		e := table.Sounds[i]
-		return e.Group, e.Sample, e.Offset, e.Length, nil
-	case 2:
-		table, err := snd.ParseV2(readerAt(data))
-		if err != nil {
-			return 0, 0, 0, 0, err
-		}
-		i, ok := table.Index(ref.group, ref.sample)
-		if !ok {
-			return 0, 0, 0, 0, fmt.Errorf("(group %d, sample %d) not found", ref.group, ref.sample)
-		}
-		e := table.Sounds[i]
-		return e.Group, e.Sample, e.Offset, e.Length, nil
-	default:
-		return 0, 0, 0, 0, fmt.Errorf("unsupported version %d", version)
+	table, err := snd.ParseV2(readerAt(data))
+	if err != nil {
+		return 0, 0, 0, 0, err
 	}
+	i, ok := table.Index(ref.group, ref.sample)
+	if !ok {
+		return 0, 0, 0, 0, fmt.Errorf("(group %d, sample %d) not found", ref.group, ref.sample)
+	}
+	e := table.Sounds[i]
+	return e.Group, e.Sample, e.Offset, e.Length, nil
 }
 
 // trim builds a minimal, real-bytes-only .snd file exposing exactly the
 // (group, sample) entries sc asks for, each entry's embedded audio copied
-// verbatim from the real source file. sc.version selects which subheader
-// layout to both locate entries with and write back out — v1's 2-byte
-// Group/Sample fields, or v2's 4-byte ones (see
-// .vibe/decisions/002-v2-subheader-uses-4-byte-group-and-sample-fields.md).
+// verbatim from the real source file. The subheader is always written with
+// 4-byte Group/Sample fields — the layout every real file actually uses,
+// regardless of declared version (see
+// .vibe/decisions/005-v1-group-sample-fields-are-4-bytes-not-2.md); only the
+// header's own version stamp differs by sc.version.
 func trim(data []byte, sc scenario) ([]byte, error) {
 	type sound struct {
 		group, sample int
@@ -292,13 +298,8 @@ func trim(data []byte, sc scenario) ([]byte, error) {
 			binary.LittleEndian.PutUint32(sub[0:4], uint32(offsets[i+1]))
 		}
 		binary.LittleEndian.PutUint32(sub[4:8], uint32(len(s.payload)))
-		if sc.version == 2 {
-			binary.LittleEndian.PutUint32(sub[8:12], uint32(int32(s.group)))
-			binary.LittleEndian.PutUint32(sub[12:16], uint32(int32(s.sample)))
-		} else {
-			binary.LittleEndian.PutUint16(sub[8:10], uint16(int16(s.group)))
-			binary.LittleEndian.PutUint16(sub[10:12], uint16(int16(s.sample)))
-		}
+		binary.LittleEndian.PutUint32(sub[8:12], uint32(int32(s.group)))
+		binary.LittleEndian.PutUint32(sub[12:16], uint32(int32(s.sample)))
 		buf.Write(sub)
 		buf.Write(s.payload)
 	}

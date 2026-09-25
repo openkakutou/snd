@@ -9,7 +9,10 @@ import (
 
 // buildV1File assembles a minimal, well-formed v1 .snd file in memory from
 // a list of (group, sample, payload) sound entries, chaining each
-// subheader's NextSubHeaderOffset the way a real file does.
+// subheader's NextSubHeaderOffset the way a real file does. Group and
+// Sample are written as adjacent 4-byte fields, matching the real subheader
+// layout ParseV1 reads (see
+// .vibe/decisions/005-v1-group-sample-fields-are-4-bytes-not-2.md).
 func buildV1File(t *testing.T, entries []v1TestEntry) []byte {
 	t.Helper()
 
@@ -36,8 +39,8 @@ func buildV1File(t *testing.T, entries []v1TestEntry) []byte {
 			binary.LittleEndian.PutUint32(sub[0:4], uint32(offsets[i+1]))
 		}
 		binary.LittleEndian.PutUint32(sub[4:8], uint32(len(e.payload)))
-		binary.LittleEndian.PutUint16(sub[8:10], uint16(int16(e.group)))
-		binary.LittleEndian.PutUint16(sub[10:12], uint16(int16(e.sample)))
+		binary.LittleEndian.PutUint32(sub[8:12], uint32(int32(e.group)))
+		binary.LittleEndian.PutUint32(sub[12:16], uint32(int32(e.sample)))
 		buf.Write(sub)
 		buf.Write(e.payload)
 	}

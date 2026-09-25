@@ -111,3 +111,48 @@ func TestV1Fixtures_Decodes8BitMonoClip_FromRealCharacterFile(t *testing.T) {
 		}
 	}
 }
+
+func TestV1Fixtures_ReadsMultiDigitSample_FromRealCharacterFile(t *testing.T) {
+	// Backlog item 004: a real v1 file's subheader stores Group and Sample
+	// as adjacent 4-byte fields, not 2-byte-plus-4-reserved as ParseV1
+	// previously assumed. Sample 143 does not fit in a 2-byte field read
+	// alongside a small Group, so a wrong reading collides it onto
+	// (group 1, sample 0) instead. See
+	// .vibe/decisions/005-v1-group-sample-fields-are-4-bytes-not-2.md.
+	f := openTestdataFile(t, "v1-multidigit-sample.snd")
+	defer f.Close()
+
+	table, err := ParseV1(f)
+	if err != nil {
+		t.Fatalf("ParseV1: %v", err)
+	}
+	if len(table.Sounds) != 1 {
+		t.Fatalf("len(Sounds) = %d, want 1", len(table.Sounds))
+	}
+
+	entry := table.Sounds[0]
+	if entry.Group != 1 || entry.Sample != 143 {
+		t.Fatalf("Sounds[0] = (group %d, sample %d), want (group 1, sample 143)", entry.Group, entry.Sample)
+	}
+
+	if _, ok := table.Index(1, 143); !ok {
+		t.Fatal("Index(1, 143): not found")
+	}
+
+	sound, err := DecodeV1Sound(f, table, 1, 143)
+	if err != nil {
+		t.Fatalf("DecodeV1Sound(1, 143): %v", err)
+	}
+	if sound.Channels != 1 {
+		t.Errorf("Channels = %d, want 1", sound.Channels)
+	}
+	if sound.SampleRate != 8000 {
+		t.Errorf("SampleRate = %d, want 8000", sound.SampleRate)
+	}
+	if sound.BitsPerSample != 8 {
+		t.Errorf("BitsPerSample = %d, want 8", sound.BitsPerSample)
+	}
+	if len(sound.PCM) == 0 {
+		t.Fatal("len(PCM) = 0, want > 0")
+	}
+}

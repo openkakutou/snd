@@ -108,10 +108,11 @@ for the full reasoning. An ADPCM entry decodes to a descriptive error
 
 ## v2 read path
 
-`.snd` v2 adds one structural difference and one behavioral extension over
-v1: `Group`/`Sample` are each a 4-byte field (v1 uses 2 bytes and cannot
-represent every real `Sample` value — see decision `002` below), and a sound
-entry can point at an external audio file instead of embedding its samples.
+`.snd` v2 adds one behavioral extension over v1: a sound entry can point at
+an external audio file instead of embedding its samples. The on-disk
+subheader layout itself (`Group`/`Sample` each a 4-byte field) is identical
+between v1 and v2 — see decisions `002` and `005` below for why, and for the
+real-file evidence behind it.
 
 ### `ParseV2`
 
@@ -145,10 +146,10 @@ type V2SoundTable struct {
 ```
 
 Same shape as v1's types; `(*V2SoundTable) Index(group, sample int) (int, bool)`
-resolves a key the same way `V1SoundTable.Index` does. See decision
-`.vibe/decisions/002-v2-subheader-uses-4-byte-group-and-sample-fields.md` for
-why v2's on-disk subheader layout differs from v1's despite the identical
-Go-level shape.
+resolves a key the same way `V1SoundTable.Index` does. See
+`.vibe/decisions/002-v2-subheader-uses-4-byte-group-and-sample-fields.md` and
+`.vibe/decisions/005-v1-group-sample-fields-are-4-bytes-not-2.md` for why v1
+and v2's on-disk subheader layouts turned out to be identical.
 
 ### `DecodeV2Sound`
 

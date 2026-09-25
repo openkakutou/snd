@@ -117,9 +117,6 @@ func TestDecodeSound_AutoDetectsV1_ForABuiltV1File(t *testing.T) {
 }
 
 func TestDecodeSound_AutoDetectsV2_ForABuiltV2File(t *testing.T) {
-	// Sample 1000 cannot be represented by v1's 2-byte Sample field — this
-	// would fail to resolve at all if DecodeSound picked the v1 code path
-	// for a v2 file.
 	data := buildV2File(t, []v1TestEntry{{group: 0, sample: 1000, payload: buildWAV(t, 1, 8000, 8, []byte{128, 130})}})
 
 	sound, err := DecodeSound(readerAtBytes(data), 0, 1000, nil)

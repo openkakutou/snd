@@ -13,6 +13,13 @@ const (
 	v1Signature = "ElecbyteSnd\x00"
 	// v1SoundSubheaderSize is the fixed size, in bytes, of one sound
 	// entry's subheader, immediately preceding its embedded audio data.
+	// Like v2's own subheader, Group and Sample each occupy a full 4
+	// bytes with nothing reserved: NextSubHeaderOffset(4) +
+	// SubFileLength(4) + Group(4) + Sample(4). This matches Ikemen GO's
+	// own reference loader, which applies it regardless of declared
+	// version, and was confirmed against real, unmodified character
+	// files at corpus scale — see
+	// .vibe/decisions/005-v1-group-sample-fields-are-4-bytes-not-2.md.
 	v1SoundSubheaderSize = 16
 )
 
@@ -99,8 +106,8 @@ func ParseV1(r io.ReaderAt) (*V1SoundTable, error) {
 
 		length := binary.LittleEndian.Uint32(sub[4:8])
 		entry := V1SoundEntry{
-			Group:  int(int16(binary.LittleEndian.Uint16(sub[8:10]))),
-			Sample: int(int16(binary.LittleEndian.Uint16(sub[10:12]))),
+			Group:  int(int32(binary.LittleEndian.Uint32(sub[8:12]))),
+			Sample: int(int32(binary.LittleEndian.Uint32(sub[12:16]))),
 			Offset: nextOffset + v1SoundSubheaderSize,
 			Length: int(length),
 		}
