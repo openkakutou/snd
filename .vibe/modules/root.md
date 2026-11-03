@@ -8,7 +8,7 @@ v1 vs v2 itself, the entry point `cmd/wasm` (see `modules/wasm.md`) builds
 on.
 
 **Files:** `version.go`, `v1.go`, `v1_decoder.go`, `v2.go`, `v2_decoder.go`,
-`decode.go`
+`decode.go`, `v1_write.go`
 
 **Exports:**
 - `Version` (string constant)
@@ -21,6 +21,8 @@ on.
 - `ExternalAudioOpener` (`func(path string) ([]byte, error)`)
 - `DecodedSound` (shared by both v1 and v2 decode)
 - `DecodeSound(r io.ReaderAt, group, sample int, openExternal ExternalAudioOpener) (*DecodedSound, error)` — auto-detects v1 vs v2 from the file's header (`header[12] == 2` signals v2, mirroring `sff.Load`'s own auto-detection technique at a different byte offset — see `.vibe/decisions/004-wasm-entrypoint-api-shape-and-version-detection.md`) and dispatches to the matching `ParseV*`+`Decode*Sound` pair; `openExternal` is ignored for a v1 file
+
+- `ReadV1Set(r io.ReaderAt) (*V1SoundSet, error)` / `EncodeV1(set *V1SoundSet) ([]byte, error)`, `V1SoundSet`, `V1Sound` — v1 write path (backlog item 005): byte-identical round trip of real files, see `.vibe/decisions/006-v1-write-path-layout-and-scope.md`
 
 **Depends on:** nothing internal yet — stdlib only (`encoding/binary`, `io`,
 `errors`, `fmt`, `path/filepath`, `strings`).

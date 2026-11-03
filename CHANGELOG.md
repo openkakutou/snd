@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A `.snd` v1 sound file can now be loaded into memory and written back out. A real, untouched file is re-written byte for byte, including its header comment: checked against nearly 500 real character files.
+
 ## [0.3.1] - 2026-09-25
 
 ### Fixed
