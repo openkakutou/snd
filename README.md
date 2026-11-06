@@ -10,6 +10,7 @@ A read/write Go library for MUGEN/Ikemen GO sound (`.snd`) files — v1 and v2 p
 - Malformed or truncated sound data, or a missing/invalid external audio file, is reported with a clear error naming the affected sound, never a crash or silently wrong audio
 - Load a v1 file into memory and write it back; a real, untouched file is re-written byte for byte, header comment included
 - Load a v2 file into memory and write it back; external audio file references stay references
+- Open a `.snd` file as a document and save it again byte for byte, replacing a single sound without touching the rest
 - Validated against real, unmodified community `.snd` files, not just hand-built test data
 - A WebAssembly build (downloadable from each release) so web apps and other JS hosts can decode sounds directly, without a Go toolchain of their own
 <!-- vibe:end:features -->

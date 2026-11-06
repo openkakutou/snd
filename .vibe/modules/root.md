@@ -8,7 +8,7 @@ v1 vs v2 itself, the entry point `cmd/wasm` (see `modules/wasm.md`) builds
 on.
 
 **Files:** `version.go`, `v1.go`, `v1_decoder.go`, `v2.go`, `v2_decoder.go`,
-`decode.go`, `v1_write.go`, `v2_write.go`
+`decode.go`, `v1_write.go`, `v2_write.go`, `document.go`
 
 **Exports:**
 - `Version` (string constant)
@@ -24,6 +24,7 @@ on.
 
 - `ReadV1Set(r io.ReaderAt) (*V1SoundSet, error)` / `EncodeV1(set *V1SoundSet) ([]byte, error)`, `V1SoundSet`, `V1Sound` — v1 write path (backlog item 005): byte-identical round trip of real files, see `.vibe/decisions/006-v1-write-path-layout-and-scope.md`
 - `ReadV2Set` / `EncodeV2`, `V2SoundSet`, `V2Sound` — v2 write path (backlog item 006), strict validation, shared container reader/writer with v1, see `.vibe/decisions/007-v2-write-path-validation-and-shared-container.md`
+- `ParseDocument(data []byte) (*Document, error)`, `Document` (`Len`, `Sound`, `SetPayload`, `Serialize`), `DocumentSound` — byte-exact round trip (backlog item 007), see `.vibe/decisions/008-document-keeps-layout-and-pointer-kinds.md`
 
 **Depends on:** nothing internal yet — stdlib only (`encoding/binary`, `io`,
 `errors`, `fmt`, `path/filepath`, `strings`).

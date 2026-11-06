@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A `.snd` file can now be opened as a whole document and saved again byte for byte, even when it carries extra bytes between or after the sounds. Replacing one sound's audio changes only that sound and the positions that have to move. Checked against nearly 500 real character files.
+
 ## [0.5.0] - 2026-11-06
 
 ### Added
