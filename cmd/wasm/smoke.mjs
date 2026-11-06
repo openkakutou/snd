@@ -89,6 +89,53 @@ const argCountResult = globalThis.OpenKakutouSnd.decode();
 assert(argCountResult.pcm === null, "decode: missing arguments returns null pcm");
 assert(typeof argCountResult.error === "string" && argCountResult.error.length > 0, "decode: missing arguments reports an error");
 
+// --- editing: add, replace and remove, each result decoded again by the same module ---
+function wav16(rate, samples) {
+	const data = new Uint8Array(samples.length * 2);
+	samples.forEach((v, i) => new DataView(data.buffer).setInt16(i * 2, v, true));
+	const out = new Uint8Array(44 + data.length);
+	const dv = new DataView(out.buffer);
+	out.set(new TextEncoder().encode("RIFF"), 0);
+	dv.setUint32(4, 36 + data.length, true);
+	out.set(new TextEncoder().encode("WAVEfmt "), 8);
+	dv.setUint32(16, 16, true);
+	dv.setUint16(20, 1, true); // PCM
+	dv.setUint16(22, 1, true); // mono
+	dv.setUint32(24, rate, true);
+	dv.setUint32(28, rate * 2, true);
+	dv.setUint16(32, 2, true);
+	dv.setUint16(34, 16, true);
+	out.set(new TextEncoder().encode("data"), 36);
+	dv.setUint32(40, data.length, true);
+	out.set(data, 44);
+	return out;
+}
+
+const added = globalThis.OpenKakutouSnd.addSound(v1Bytes, 7, 3, wav16(16000, [1, -2, 3]));
+assert(added.error === null && added.bytes instanceof Uint8Array, `addSound: nominal returns bytes (got: ${added.error})`);
+const addedDecoded = globalThis.OpenKakutouSnd.decode(added.bytes, 7, 3);
+assert(addedDecoded.error === null && addedDecoded.sampleRate === 16000 && addedDecoded.pcm.length === 3, "addSound: the new sound decodes with the rate and samples given");
+assert(globalThis.OpenKakutouSnd.decode(added.bytes, 1, 0).pcm.length === 2772, "addSound: the existing sound is untouched");
+
+const replaced = globalThis.OpenKakutouSnd.replaceSound(added.bytes, 7, 3, wav16(8000, [5, 6]));
+assert(replaced.error === null, `replaceSound: nominal reports no error (got: ${replaced.error})`);
+const replacedDecoded = globalThis.OpenKakutouSnd.decode(replaced.bytes, 7, 3);
+assert(replacedDecoded.sampleRate === 8000 && replacedDecoded.pcm.length === 2, "replaceSound: the sound now decodes as the new audio");
+
+const removed = globalThis.OpenKakutouSnd.removeSound(replaced.bytes, 7, 3);
+assert(removed.error === null, `removeSound: nominal reports no error (got: ${removed.error})`);
+assert(globalThis.OpenKakutouSnd.decode(removed.bytes, 7, 3).pcm === null, "removeSound: the sound is gone");
+assert(globalThis.OpenKakutouSnd.decode(removed.bytes, 1, 0).error === null, "removeSound: the other sound still decodes");
+
+const duplicate = globalThis.OpenKakutouSnd.addSound(v1Bytes, 1, 0, wav16(8000, [1]));
+assert(duplicate.bytes === null && /already exists/.test(duplicate.error), `addSound: a duplicate key is refused (got: ${duplicate.error})`);
+const notWav = globalThis.OpenKakutouSnd.addSound(v1Bytes, 9, 9, new TextEncoder().encode("not audio at all"));
+assert(notWav.bytes === null && typeof notWav.error === "string", "addSound: non-WAV audio is refused");
+const missing = globalThis.OpenKakutouSnd.removeSound(v1Bytes, 999, 999);
+assert(missing.bytes === null && /no sound/.test(missing.error), `removeSound: a missing sound is refused (got: ${missing.error})`);
+const editArgs = globalThis.OpenKakutouSnd.replaceSound();
+assert(editArgs.bytes === null && typeof editArgs.error === "string", "replaceSound: missing arguments report an error");
+
 // The module must still respond correctly after every error above — proves
 // none of them left the Go runtime in a broken state.
 const afterErrorsResult = globalThis.OpenKakutouSnd.decode(v1Bytes, 1, 0);

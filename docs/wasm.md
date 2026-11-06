@@ -75,12 +75,35 @@ const result = globalThis.OpenKakutouSnd.decode(sndBytes, 0, 7, (path) => {
 });
 ```
 
+## Editing a sound set
+
+Three more globals edit a `.snd` file (v1 or v2) and return a new copy:
+
+```js
+OpenKakutouSnd.addSound(sndBytes, group, sample, wavBytes)
+OpenKakutouSnd.replaceSound(sndBytes, group, sample, wavBytes)
+OpenKakutouSnd.removeSound(sndBytes, group, sample)
+```
+
+- `wavBytes` is a `Uint8Array` holding a RIFF/WAVE file of plain PCM,
+  8-bit or 16-bit, with at least one channel and a non-zero sample rate.
+  Anything else is refused: this library never converts audio, so convert
+  it before handing it in.
+- Each returns `{ bytes, error }`, exactly one non-`null`. `bytes` is a
+  `Uint8Array` of the edited file. `error` names the problem: a key that
+  already exists (add) or is missing (replace, remove), audio the rule
+  refuses, a file that cannot be read, or a wrong argument count.
+- Everything else in the file is kept byte for byte (header comment, gaps,
+  bytes after the last sound); only the offsets that must move change.
+- Like `decode`, these never throw and a prior error leaves the module
+  usable.
+
 ## Verifying a build
 
 `cmd/wasm/smoke.mjs` is a Node.js harness that loads a built module the same
 way a browser would (via `wasm_exec.js`) and exercises the nominal path
-(both versions, auto-detected), the external-file-reference path, and error
-paths — the closest thing to `go test` this file has, since `syscall/js`
+(both versions, auto-detected), the external-file-reference path, the three
+editing functions, and error paths — the closest thing to `go test` this file has, since `syscall/js`
 code cannot run under the plain Go toolchain:
 
 ```sh

@@ -20,6 +20,7 @@
 - v1 write path (`ReadV1Set`/`EncodeV1`) keeps the header comment and ends the last subheader at end of file, as all 483 real v1 files do; a corpus check gated by `SND_CORPUS_DIR` proves byte identity (see `decisions/006`)
 - v2 write path (`ReadV2Set`/`EncodeV2`) reuses the v1 container reader and writer and validates strictly so the output reads back as written (see `decisions/007`)
 - `Document` keeps gaps, trailing bytes and the kind of each last pointer so an untouched file serializes byte-identical (496 real files checked); one Document serves v1 and v2 (see `decisions/008`)
+- Editing a `Document` (add/replace/remove by key) refuses audio that is not 8/16-bit PCM WAV instead of converting it, and a refused edit leaves the document unchanged; the same three operations are exposed as `OpenKakutouSnd.addSound`/`replaceSound`/`removeSound` (see `decisions/009`)
 
 ## Other context files
 - [`models.md`](models.md) — data models

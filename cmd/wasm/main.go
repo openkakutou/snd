@@ -27,12 +27,15 @@ import (
 
 func main() {
 	js.Global().Set("OpenKakutouSnd", js.ValueOf(map[string]any{
-		"decode": js.FuncOf(decode),
+		"decode":       js.FuncOf(decode),
+		"addSound":     js.FuncOf(addSound),
+		"replaceSound": js.FuncOf(replaceSound),
+		"removeSound":  js.FuncOf(removeSound),
 	}))
 
-	// Registering the js.FuncOf callback does not keep the Go runtime alive
-	// on its own; block forever so OpenKakutouSnd.decode keeps working for
-	// the lifetime of the page.
+	// Registering the js.FuncOf callbacks does not keep the Go runtime alive
+	// on its own; block forever so OpenKakutouSnd keeps working for the
+	// lifetime of the page.
 	select {}
 }
 
@@ -186,4 +189,79 @@ func pcmToJS(pcm []int16) js.Value {
 	arrayBuffer := js.Global().Get("Uint8Array").New(len(buf))
 	js.CopyBytesToJS(arrayBuffer, buf)
 	return js.Global().Get("Int16Array").New(arrayBuffer.Get("buffer"))
+}
+
+// addSound is OpenKakutouSnd.addSound(sndBytes, group, sample, wavBytes):
+// returns a copy of the .snd file with a new sound appended. wavBytes must
+// be a PCM WAV (8- or 16-bit); anything else is refused, never converted.
+func addSound(this js.Value, args []js.Value) any {
+	return editSound("addSound", 4, args, func(doc *snd.Document, group, sample int, wav []byte) error {
+		return doc.AddSound(group, sample, wav)
+	})
+}
+
+// replaceSound is OpenKakutouSnd.replaceSound(sndBytes, group, sample,
+// wavBytes): returns a copy of the file with that sound's audio replaced.
+func replaceSound(this js.Value, args []js.Value) any {
+	return editSound("replaceSound", 4, args, func(doc *snd.Document, group, sample int, wav []byte) error {
+		return doc.ReplaceSound(group, sample, wav)
+	})
+}
+
+// removeSound is OpenKakutouSnd.removeSound(sndBytes, group, sample):
+// returns a copy of the file without that sound.
+func removeSound(this js.Value, args []js.Value) any {
+	return editSound("removeSound", 3, args, func(doc *snd.Document, group, sample int, _ []byte) error {
+		return doc.RemoveSound(group, sample)
+	})
+}
+
+// editSound is the shared body of the three editing functions: parse the
+// file into a Document, apply edit, serialize. wantArgs is 3 (no audio) or
+// 4 (audio last). Always returns { bytes, error }, exactly one non-null;
+// never throws and never lets a panic escape (see decode).
+func editSound(name string, wantArgs int, args []js.Value, edit func(doc *snd.Document, group, sample int, wav []byte) error) (result any) {
+	defer func() {
+		if r := recover(); r != nil {
+			result = editResult(nil, fmt.Errorf("OpenKakutouSnd.%s: panic: %v", name, r))
+		}
+	}()
+
+	if len(args) < wantArgs {
+		return editResult(nil, fmt.Errorf("OpenKakutouSnd.%s: expected %d arguments, got %d", name, wantArgs, len(args)))
+	}
+	sndBytes, err := bytesFromJS(args[0])
+	if err != nil {
+		return editResult(nil, fmt.Errorf("OpenKakutouSnd.%s: sndBytes: %w", name, err))
+	}
+	var wav []byte
+	if wantArgs == 4 {
+		if wav, err = bytesFromJS(args[3]); err != nil {
+			return editResult(nil, fmt.Errorf("OpenKakutouSnd.%s: wavBytes: %w", name, err))
+		}
+	}
+
+	doc, err := snd.ParseDocument(sndBytes)
+	if err != nil {
+		return editResult(nil, err)
+	}
+	if err := edit(doc, args[1].Int(), args[2].Int(), wav); err != nil {
+		return editResult(nil, err)
+	}
+	out, err := doc.Serialize()
+	if err != nil {
+		return editResult(nil, err)
+	}
+	return editResult(out, nil)
+}
+
+// editResult builds the { bytes, error } JS return shape of the editing
+// functions: bytes is a Uint8Array.
+func editResult(out []byte, err error) map[string]any {
+	if err != nil {
+		return map[string]any{"bytes": nil, "error": err.Error()}
+	}
+	arr := js.Global().Get("Uint8Array").New(len(out))
+	js.CopyBytesToJS(arr, out)
+	return map[string]any{"bytes": arr, "error": nil}
 }

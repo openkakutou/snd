@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Sounds can now be added to, replaced in and removed from a `.snd` file, in Go and from the WebAssembly build. The audio must be plain 8-bit or 16-bit PCM WAV; anything else is refused with a clear error rather than converted. Everything else in the file is kept as it was.
+
 ## [0.6.0] - 2026-11-06
 
 ### Added

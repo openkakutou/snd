@@ -301,3 +301,27 @@ running past the end of `data`, a first subheader overlapping the header and
 sounds not laid out in increasing order of offset ("unsupported layout").
 `Sound` and `SetPayload` refuse an index out of range. `Serialize` refuses
 a file past 4 GiB. See `.vibe/decisions/008-document-keeps-layout-and-pointer-kinds.md`.
+
+## Editing sounds
+
+```go
+func (d *Document) Find(group, sample int) (int, bool)
+func (d *Document) AddSound(group, sample int, wav []byte) error
+func (d *Document) ReplaceSound(group, sample int, wav []byte) error
+func (d *Document) RemoveSound(group, sample int) error
+```
+
+Edit a `Document` by `(group, sample)` key. Everything the edit does not
+touch is kept byte for byte. `AddSound` appends after the last sound and
+refuses a key already in the document. `ReplaceSound` and `RemoveSound`
+refuse a key that is not there; when a real file holds the same key twice,
+the first one is used.
+
+**Audio rule.** `wav` must be a RIFF/WAVE blob of plain PCM, 8-bit or
+16-bit, with at least one channel and a non-zero sample rate — exactly what
+`DecodeV1Sound` and `DecodeV2Sound` read back. Anything else (ADPCM, 24-bit,
+a broken file) is **refused, never converted**: converting needs a
+resampler and codecs this stdlib-only library does not carry. A refused edit
+leaves the document unchanged. The same three operations are exported to
+JavaScript, see [wasm.md](wasm.md). See
+`.vibe/decisions/009-editing-api-rejects-non-conformant-audio.md`.
