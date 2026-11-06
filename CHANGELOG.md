@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A `.snd` v2 sound file can now be loaded into memory and written back out. A sound that points at an external audio file stays a reference and is not copied into the file. A set that cannot be read back as written (two sounds with the same group and sample, an empty sound, audio that is not WAV, or a bad external file name) is refused with a clear error.
+
 ## [0.4.0] - 2026-11-03
 
 ### Added

@@ -50,37 +50,63 @@ func ReadV1Set(r io.ReaderAt) (*V1SoundSet, error) {
 		return nil, err
 	}
 
+	entries := make([]containerEntry, len(table.Sounds))
+	for i, e := range table.Sounds {
+		entries[i] = containerEntry{Group: e.Group, Sample: e.Sample, Offset: e.Offset, Length: e.Length}
+	}
+	padding, payloads, err := readContainer(r, "v1", entries)
+	if err != nil {
+		return nil, err
+	}
+
 	set := &V1SoundSet{
 		Version:       table.Header.Version,
-		HeaderPadding: []byte{},
-		Sounds:        make([]V1Sound, 0, len(table.Sounds)),
+		HeaderPadding: padding,
+		Sounds:        make([]V1Sound, len(entries)),
 	}
-
-	if len(table.Sounds) > 0 {
-		first := table.Sounds[0].Offset - v1SoundSubheaderSize
-		if first < v1HeaderFieldsSize {
-			return nil, fmt.Errorf("snd: v1 first sound subheader at offset %d overlaps the file header", first)
-		}
-		// ParseV1 already read a subheader at first, so the file is at
-		// least that long: the padding allocation is bounded by real data.
-		set.HeaderPadding = make([]byte, first-v1HeaderFieldsSize)
-		if _, err := r.ReadAt(set.HeaderPadding, v1HeaderFieldsSize); err != nil {
-			return nil, fmt.Errorf("snd: reading v1 header padding: %w", err)
-		}
+	for i, e := range entries {
+		set.Sounds[i] = V1Sound{Group: e.Group, Sample: e.Sample, Audio: payloads[i]}
 	}
-
-	for i, e := range table.Sounds {
-		audio, err := io.ReadAll(io.NewSectionReader(r, e.Offset, int64(e.Length)))
-		if err != nil {
-			return nil, fmt.Errorf("snd: reading v1 sound %d (group %d, sample %d): %w", i, e.Group, e.Sample, err)
-		}
-		if len(audio) != e.Length {
-			return nil, fmt.Errorf("snd: v1 sound %d (group %d, sample %d) is truncated: want %d bytes, file holds %d", i, e.Group, e.Sample, e.Length, len(audio))
-		}
-		set.Sounds = append(set.Sounds, V1Sound{Group: e.Group, Sample: e.Sample, Audio: audio})
-	}
-
 	return set, nil
+}
+
+// containerEntry is a located sound entry of either file version: v1 and v2
+// share the same container layout, only the payload's meaning differs.
+type containerEntry struct {
+	Group, Sample int
+	Offset        int64
+	Length        int
+}
+
+// readContainer reads the header padding and every payload of an already
+// parsed sound table. kind ("v1" or "v2") only names the file in errors.
+func readContainer(r io.ReaderAt, kind string, entries []containerEntry) (padding []byte, payloads [][]byte, err error) {
+	padding = []byte{}
+	if len(entries) > 0 {
+		first := entries[0].Offset - v1SoundSubheaderSize
+		if first < v1HeaderFieldsSize {
+			return nil, nil, fmt.Errorf("snd: %s first sound subheader at offset %d overlaps the file header", kind, first)
+		}
+		// The parser already read a subheader at first, so the file is at
+		// least that long: the padding allocation is bounded by real data.
+		padding = make([]byte, first-v1HeaderFieldsSize)
+		if _, err := r.ReadAt(padding, v1HeaderFieldsSize); err != nil {
+			return nil, nil, fmt.Errorf("snd: reading %s header padding: %w", kind, err)
+		}
+	}
+
+	payloads = make([][]byte, len(entries))
+	for i, e := range entries {
+		payload, err := io.ReadAll(io.NewSectionReader(r, e.Offset, int64(e.Length)))
+		if err != nil {
+			return nil, nil, fmt.Errorf("snd: reading %s sound %d (group %d, sample %d): %w", kind, i, e.Group, e.Sample, err)
+		}
+		if len(payload) != e.Length {
+			return nil, nil, fmt.Errorf("snd: %s sound %d (group %d, sample %d) is truncated: want %d bytes, file holds %d", kind, i, e.Group, e.Sample, e.Length, len(payload))
+		}
+		payloads[i] = payload
+	}
+	return padding, payloads, nil
 }
 
 // EncodeV1 serialises set as a .snd v1 file: header, header padding, then
@@ -92,18 +118,33 @@ func EncodeV1(set *V1SoundSet) ([]byte, error) {
 	if set == nil {
 		return nil, fmt.Errorf("snd: encoding a nil v1 sound set")
 	}
-
-	total := int64(v1HeaderFieldsSize) + int64(len(set.HeaderPadding))
+	entries := make([]containerPayload, len(set.Sounds))
 	for i, s := range set.Sounds {
+		entries[i] = containerPayload{Group: s.Group, Sample: s.Sample, Payload: s.Audio}
+	}
+	return encodeContainer(set.Version, set.HeaderPadding, entries)
+}
+
+// containerPayload is one sound to write: its key and its payload bytes.
+type containerPayload struct {
+	Group, Sample int
+	Payload       []byte
+}
+
+// encodeContainer writes the header, padding and contiguous sound table
+// shared by v1 and v2 files.
+func encodeContainer(version [4]byte, padding []byte, sounds []containerPayload) ([]byte, error) {
+	total := int64(v1HeaderFieldsSize) + int64(len(padding))
+	for i, s := range sounds {
 		if s.Group < math.MinInt32 || s.Group > math.MaxInt32 {
-			return nil, fmt.Errorf("snd: v1 sound %d has group %d outside the signed 32-bit range", i, s.Group)
+			return nil, fmt.Errorf("snd: sound %d has group %d outside the signed 32-bit range", i, s.Group)
 		}
 		if s.Sample < math.MinInt32 || s.Sample > math.MaxInt32 {
-			return nil, fmt.Errorf("snd: v1 sound %d (group %d) has sample %d outside the signed 32-bit range", i, s.Group, s.Sample)
+			return nil, fmt.Errorf("snd: sound %d (group %d) has sample %d outside the signed 32-bit range", i, s.Group, s.Sample)
 		}
-		total += v1SoundSubheaderSize + int64(len(s.Audio))
+		total += v1SoundSubheaderSize + int64(len(s.Payload))
 		if total > math.MaxUint32 {
-			return nil, fmt.Errorf("snd: v1 file would exceed the format's 4 GiB limit at sound %d (group %d, sample %d)", i, s.Group, s.Sample)
+			return nil, fmt.Errorf("snd: file would exceed the format's 4 GiB limit at sound %d (group %d, sample %d)", i, s.Group, s.Sample)
 		}
 	}
 
@@ -111,21 +152,21 @@ func EncodeV1(set *V1SoundSet) ([]byte, error) {
 
 	header := make([]byte, v1HeaderFieldsSize)
 	copy(header[0:12], v1Signature)
-	copy(header[12:16], set.Version[:])
-	binary.LittleEndian.PutUint32(header[16:20], uint32(len(set.Sounds)))
-	binary.LittleEndian.PutUint32(header[20:24], uint32(v1HeaderFieldsSize+len(set.HeaderPadding)))
+	copy(header[12:16], version[:])
+	binary.LittleEndian.PutUint32(header[16:20], uint32(len(sounds)))
+	binary.LittleEndian.PutUint32(header[20:24], uint32(v1HeaderFieldsSize+len(padding)))
 	out = append(out, header...)
-	out = append(out, set.HeaderPadding...)
+	out = append(out, padding...)
 
-	for _, s := range set.Sounds {
-		next := int64(len(out)) + v1SoundSubheaderSize + int64(len(s.Audio))
+	for _, s := range sounds {
+		next := int64(len(out)) + v1SoundSubheaderSize + int64(len(s.Payload))
 		sub := make([]byte, v1SoundSubheaderSize)
 		binary.LittleEndian.PutUint32(sub[0:4], uint32(next))
-		binary.LittleEndian.PutUint32(sub[4:8], uint32(len(s.Audio)))
+		binary.LittleEndian.PutUint32(sub[4:8], uint32(len(s.Payload)))
 		binary.LittleEndian.PutUint32(sub[8:12], uint32(int32(s.Group)))
 		binary.LittleEndian.PutUint32(sub[12:16], uint32(int32(s.Sample)))
 		out = append(out, sub...)
-		out = append(out, s.Audio...)
+		out = append(out, s.Payload...)
 	}
 
 	return out, nil
