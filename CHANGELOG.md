@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-06
+
 ### Added
 
 - Sounds can now be added to, replaced in and removed from a `.snd` file, in Go and from the WebAssembly build. The audio must be plain 8-bit or 16-bit PCM WAV; anything else is refused with a clear error rather than converted. Everything else in the file is kept as it was.
@@ -53,7 +55,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Read a `.snd` v1 file's header and sound table, keyed by `(group, sample)`, and decode each entry's embedded audio to raw PCM samples. Malformed headers or truncated sample data return a descriptive error naming the offending entry instead of panicking or producing silently wrong audio. Validated against real, unmodified community `.snd` files. ADPCM-encoded entries are not supported — real files and Ikemen GO's own reference sound loader only ever use plain PCM, so this is a documented, permanent scope cut rather than unverifiable speculative code.
 
-[Unreleased]: https://github.com/openkakutou/snd/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/openkakutou/snd/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/openkakutou/snd/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/openkakutou/snd/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/openkakutou/snd/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/openkakutou/snd/compare/v0.3.1...v0.4.0
