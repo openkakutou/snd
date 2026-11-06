@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-06
+
 ### Added
 
 - A `.snd` v2 sound file can now be loaded into memory and written back out. A sound that points at an external audio file stays a reference and is not copied into the file. A set that cannot be read back as written (two sounds with the same group and sample, an empty sound, audio that is not WAV, or a bad external file name) is refused with a clear error.
@@ -41,7 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Read a `.snd` v1 file's header and sound table, keyed by `(group, sample)`, and decode each entry's embedded audio to raw PCM samples. Malformed headers or truncated sample data return a descriptive error naming the offending entry instead of panicking or producing silently wrong audio. Validated against real, unmodified community `.snd` files. ADPCM-encoded entries are not supported — real files and Ikemen GO's own reference sound loader only ever use plain PCM, so this is a documented, permanent scope cut rather than unverifiable speculative code.
 
-[Unreleased]: https://github.com/openkakutou/snd/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/openkakutou/snd/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/openkakutou/snd/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/openkakutou/snd/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/openkakutou/snd/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/openkakutou/snd/compare/v0.2.0...v0.3.0
