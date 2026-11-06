@@ -69,6 +69,10 @@ const externalResult = globalThis.OpenKakutouSnd.decode(externalRefBytes, 0, 7, 
 assert(externalResult.error === null, `decode: external reference reports no error (got: ${externalResult.error})`);
 assert(externalResult.pcm instanceof Int16Array && externalResult.pcm.length > 0, "decode: external reference returns a non-empty pcm buffer resolved from the real external file");
 
+// --- decode: resolveExternal may return a Node Buffer (a Uint8Array subclass) ---
+const bufferResult = globalThis.OpenKakutouSnd.decode(externalRefBytes, 0, 7, (requestedPath) => readFileSync(path.join(repoRoot, "testdata", "files", requestedPath)));
+assert(bufferResult.error === null && bufferResult.pcm.length > 0, `decode: resolveExternal returning a Buffer is accepted (got: ${bufferResult.error})`);
+
 // --- decode: v2 external-file-reference with no resolver supplied: a clean error, not a throw ---
 const noResolverResult = globalThis.OpenKakutouSnd.decode(externalRefBytes, 0, 7);
 assert(noResolverResult.pcm === null, "decode: external reference without a resolver returns null pcm");
@@ -133,6 +137,12 @@ const notWav = globalThis.OpenKakutouSnd.addSound(v1Bytes, 9, 9, new TextEncoder
 assert(notWav.bytes === null && typeof notWav.error === "string", "addSound: non-WAV audio is refused");
 const missing = globalThis.OpenKakutouSnd.removeSound(v1Bytes, 999, 999);
 assert(missing.bytes === null && /no sound/.test(missing.error), `removeSound: a missing sound is refused (got: ${missing.error})`);
+const badGroup = globalThis.OpenKakutouSnd.removeSound(v1Bytes, "not a number", 0);
+assert(badGroup.bytes === null && typeof badGroup.error === "string", "removeSound: a non-numeric group reports an error");
+const missingReplace = globalThis.OpenKakutouSnd.replaceSound(v1Bytes, 999, 999, wav16(8000, [1]));
+assert(missingReplace.bytes === null && /no sound/.test(missingReplace.error), "replaceSound: a missing sound is refused");
+const v2Added = globalThis.OpenKakutouSnd.addSound(v2Bytes, 9, 9, wav16(16000, [1, 2]));
+assert(v2Added.error === null && globalThis.OpenKakutouSnd.decode(v2Added.bytes, 9, 9).sampleRate === 16000, "addSound: works on a v2 file");
 const editArgs = globalThis.OpenKakutouSnd.replaceSound();
 assert(editArgs.bytes === null && typeof editArgs.error === "string", "replaceSound: missing arguments report an error");
 

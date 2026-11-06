@@ -278,7 +278,6 @@ version stamp whose first byte is not 2, plus what `EncodeV1` refuses. See
 func ParseDocument(data []byte) (*Document, error)
 func (d *Document) Len() int
 func (d *Document) Sound(i int) (DocumentSound, error)
-func (d *Document) SetPayload(i int, payload []byte) error
 func (d *Document) Serialize() ([]byte, error)
 
 type DocumentSound struct {
@@ -292,14 +291,14 @@ A `.snd` file (v1 or v2: they share one layout) that writes back
 byte-identical when untouched. It keeps the version bytes, the header
 comment, the bytes between sounds, the bytes after the last sound, and what
 each last pointer pointed at (end of file, zero, or a literal value).
-`SetPayload` replaces one sound's payload; `Serialize` then changes only
-that sound's entry and the offsets that must move. 496 real files
+Edits (see "Editing sounds" below) change only the edited sound's entry
+and the offsets that must move. 496 real files
 round-trip byte-identical.
 
 **Errors:** `ParseDocument` returns the `ParseV1` errors, plus a payload
 running past the end of `data`, a first subheader overlapping the header and
 sounds not laid out in increasing order of offset ("unsupported layout").
-`Sound` and `SetPayload` refuse an index out of range. `Serialize` refuses
+`Sound` refuses an index out of range. `Serialize` refuses
 a file past 4 GiB. See `.vibe/decisions/008-document-keeps-layout-and-pointer-kinds.md`.
 
 ## Editing sounds
@@ -316,6 +315,8 @@ touch is kept byte for byte. `AddSound` appends after the last sound and
 refuses a key already in the document. `ReplaceSound` and `RemoveSound`
 refuse a key that is not there; when a real file holds the same key twice,
 the first one is used.
+
+A key outside the signed 32-bit range is refused by `AddSound`, as it is by `EncodeV1` and `EncodeV2`.
 
 **Audio rule.** `wav` must be a RIFF/WAVE blob of plain PCM, 8-bit or
 16-bit, with at least one channel and a non-zero sample rate — exactly what

@@ -132,10 +132,10 @@ func (d *Document) Sound(i int) (DocumentSound, error) {
 	return DocumentSound{Group: s.group, Sample: s.sample, Payload: append([]byte{}, s.payload...)}, nil
 }
 
-// SetPayload replaces the i-th sound's payload. Nothing else of the
-// document changes. It does not check that payload is audio — the
-// editing API validates what it hands in.
-func (d *Document) SetPayload(i int, payload []byte) error {
+// setPayload replaces the i-th sound's payload. Nothing else of the
+// document changes. It does not check that payload is audio: the exported
+// editing operations validate what they hand in.
+func (d *Document) setPayload(i int, payload []byte) error {
 	if i < 0 || i >= len(d.sounds) {
 		return fmt.Errorf("snd: sound index %d out of range [0, %d)", i, len(d.sounds))
 	}
@@ -144,29 +144,27 @@ func (d *Document) SetPayload(i int, payload []byte) error {
 }
 
 // Serialize writes the document out. An untouched document gives back the
-// bytes ParseDocument read. After SetPayload, only the edited sound's
-// payload and length, and the pointers that have to follow, differ.
+// bytes ParseDocument read. After an edit, only the edited sound's payload
+// and length, and the pointers that have to follow, differ.
 func (d *Document) Serialize() ([]byte, error) {
 	total := int64(v1HeaderFieldsSize) + int64(len(d.padding)) + int64(len(d.trailing))
-	for _, s := range d.sounds {
+	for i, s := range d.sounds {
+		if err := checkSoundKey(s.group, s.sample); err != nil {
+			return nil, fmt.Errorf("snd: sound %d: %w", i, err)
+		}
 		total += v1SoundSubheaderSize + int64(len(s.payload)) + int64(len(s.gap))
 	}
 	if total > math.MaxUint32 {
 		return nil, fmt.Errorf("snd: file would exceed the format's 4 GiB limit")
 	}
 
-	out := make([]byte, 0, total)
-
-	header := make([]byte, v1HeaderFieldsSize)
-	copy(header[0:12], v1Signature)
-	copy(header[12:16], d.version[:])
-	binary.LittleEndian.PutUint32(header[16:20], uint32(len(d.sounds)))
 	first := d.firstLiteral
 	if len(d.sounds) > 0 {
 		first = uint32(v1HeaderFieldsSize + len(d.padding))
 	}
-	binary.LittleEndian.PutUint32(header[20:24], first)
-	out = append(out, header...)
+
+	out := make([]byte, 0, total)
+	out = append(out, putHeader(d.version, len(d.sounds), first)...)
 	out = append(out, d.padding...)
 
 	for _, s := range d.sounds {
@@ -183,12 +181,7 @@ func (d *Document) Serialize() ([]byte, error) {
 			next = s.literal
 		}
 
-		sub := make([]byte, v1SoundSubheaderSize)
-		binary.LittleEndian.PutUint32(sub[0:4], next)
-		binary.LittleEndian.PutUint32(sub[4:8], uint32(len(s.payload)))
-		binary.LittleEndian.PutUint32(sub[8:12], uint32(int32(s.group)))
-		binary.LittleEndian.PutUint32(sub[12:16], uint32(int32(s.sample)))
-		out = append(out, sub...)
+		out = append(out, putSubheader(next, uint32(len(s.payload)), s.group, s.sample)...)
 		out = append(out, s.payload...)
 		out = append(out, s.gap...)
 	}

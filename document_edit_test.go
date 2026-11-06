@@ -246,3 +246,178 @@ func TestDocument_FindReturnsTheFirstMatch(t *testing.T) {
 		t.Error("Find(3, 3) found a sound that is not there")
 	}
 }
+
+func TestDocument_AddSoundRefusesKeysOutsideThe32BitRange(t *testing.T) {
+	wav := buildWAV(t, 1, 8000, 8, []byte{0x80})
+	for name, k := range map[string][2]int{
+		"group too large":   {1 << 32, 0},
+		"group too small":   {-(1 << 31) - 1, 0},
+		"sample too large":  {1, 1 << 32},
+		"truncates to dupe": {1<<32 + 1, 0}, // would be written as (1, 0), which exists
+	} {
+		t.Run(name, func(t *testing.T) {
+			doc, _ := threeSounds(t)
+			err := doc.AddSound(k[0], k[1], wav)
+			if err == nil || !strings.Contains(err.Error(), "32-bit range") {
+				t.Fatalf("err = %v, want a 32-bit range error", err)
+			}
+			if doc.Len() != 3 {
+				t.Errorf("a refused add changed the document: Len = %d", doc.Len())
+			}
+		})
+	}
+}
+
+// gapAndTrailerFile is a two-sound file with 4 bytes between the sounds and
+// 5 bytes after the last one, whose last pointer is lastPointer.
+func gapAndTrailerFile(t *testing.T, lastPointer uint32) []byte {
+	t.Helper()
+	wav1 := buildWAV(t, 1, 8000, 8, []byte{0x80})
+	wav2 := buildWAV(t, 1, 8000, 8, []byte{0x81, 0x82})
+	base := buildV1File(t, []v1TestEntry{
+		{group: 1, sample: 0, payload: wav1},
+		{group: 2, sample: 0, payload: wav2},
+	})
+	secondStart := 24 + 16 + len(wav1)
+	data := append(append(append([]byte{}, base[:secondStart]...), "GAP!"...), base[secondStart:]...)
+	binary.LittleEndian.PutUint32(data[24:28], uint32(secondStart+4)) // first sound leads past the gap
+	binary.LittleEndian.PutUint32(data[secondStart+4:secondStart+8], lastPointer)
+	return append(data, "TRAIL"...)
+}
+
+func TestDocument_EditsKeepGapTrailerAndLastPointerKind(t *testing.T) {
+	wav := buildWAV(t, 1, 8000, 8, []byte{0x80, 0x90})
+	for name, pointer := range map[string]uint32{"zero": 0, "literal": 77} {
+		t.Run("add keeps the "+name+" pointer on the new last sound", func(t *testing.T) {
+			doc, err := ParseDocument(gapAndTrailerFile(t, pointer))
+			if err != nil {
+				t.Fatalf("ParseDocument: %v", err)
+			}
+			if err := doc.AddSound(3, 0, wav); err != nil {
+				t.Fatalf("AddSound: %v", err)
+			}
+			out := serializeDoc(t, doc)
+			if !bytes.HasSuffix(out, append(append([]byte{}, wav...), "TRAIL"...)) {
+				t.Error("trailing bytes do not follow the new sound")
+			}
+			if !bytes.Contains(out, []byte("GAP!")) {
+				t.Error("the gap between the first two sounds was lost")
+			}
+			lastSub := len(out) - 5 - len(wav) - 16
+			if got := binary.LittleEndian.Uint32(out[lastSub : lastSub+4]); got != pointer {
+				t.Errorf("new last pointer = %d, want %d", got, pointer)
+			}
+			middle := lastSub - 16 - len(buildWAV(t, 1, 8000, 8, []byte{0x81, 0x82}))
+			if got := binary.LittleEndian.Uint32(out[middle : middle+4]); int(got) != lastSub {
+				t.Errorf("old last sound's pointer = %d, want it to lead to the new sound at %d", got, lastSub)
+			}
+		})
+	}
+
+	t.Run("removing the last sound drops the gap before it and keeps the trailer", func(t *testing.T) {
+		doc, err := ParseDocument(gapAndTrailerFile(t, 0))
+		if err != nil {
+			t.Fatalf("ParseDocument: %v", err)
+		}
+		if err := doc.RemoveSound(2, 0); err != nil {
+			t.Fatalf("RemoveSound: %v", err)
+		}
+		out := serializeDoc(t, doc)
+		if bytes.Contains(out, []byte("GAP!")) {
+			t.Error("the gap led to a sound that no longer exists and should be gone")
+		}
+		if !bytes.HasSuffix(out, []byte("TRAIL")) {
+			t.Error("trailing bytes lost")
+		}
+		sub := 24
+		if got := binary.LittleEndian.Uint32(out[sub : sub+4]); got != 0 {
+			t.Errorf("new last pointer = %d, want 0 (the removed sound's kind)", got)
+		}
+	})
+
+	t.Run("removing a middle sound takes the gap after it", func(t *testing.T) {
+		doc, err := ParseDocument(gapAndTrailerFile(t, 0))
+		if err != nil {
+			t.Fatalf("ParseDocument: %v", err)
+		}
+		if err := doc.RemoveSound(1, 0); err != nil {
+			t.Fatalf("RemoveSound: %v", err)
+		}
+		if out := serializeDoc(t, doc); bytes.Contains(out, []byte("GAP!")) {
+			t.Error("the removed sound's gap should go with it")
+		}
+	})
+}
+
+func TestDocument_RemovingEverySoundKeepsTheCommentAndAllowsAddingBack(t *testing.T) {
+	doc, _ := threeSounds(t)
+	for _, k := range [][2]int{{1, 0}, {1, 1}, {2, 0}} {
+		_ = doc.RemoveSound(k[0], k[1])
+	}
+	emptied := serializeDoc(t, doc)
+	if got := binary.LittleEndian.Uint32(emptied[16:20]); got != 0 {
+		t.Errorf("sound count = %d, want 0", got)
+	}
+	if !bytes.Contains(emptied, []byte("Made in a test\nwith a comment")) {
+		t.Error("the header comment was lost")
+	}
+	if err := doc.AddSound(4, 4, buildWAV(t, 1, 8000, 8, []byte{0x80})); err != nil {
+		t.Fatalf("AddSound after emptying: %v", err)
+	}
+	if keys := decodeAll(t, doc); len(keys) != 1 || keys[0] != [2]int{4, 4} {
+		t.Errorf("keys = %v, want [(4, 4)]", keys)
+	}
+}
+
+func TestDocument_EditsWorkOnV2FilesIncludingExternalReferences(t *testing.T) {
+	wav := buildWAV(t, 1, 22050, 16, []byte{5, 0, 6, 0})
+	doc, err := ParseDocument(readFixture(t, "v2-external-ref.snd"))
+	if err != nil {
+		t.Fatalf("ParseDocument: %v", err)
+	}
+	s, _ := doc.Sound(0)
+
+	if err := doc.ReplaceSound(s.Group, s.Sample, wav); err != nil {
+		t.Fatalf("ReplaceSound of an external reference: %v", err)
+	}
+	if err := doc.AddSound(9, 9, wav); err != nil {
+		t.Fatalf("AddSound: %v", err)
+	}
+	data := serializeDoc(t, doc)
+
+	for _, k := range [][2]int{{s.Group, s.Sample}, {9, 9}} {
+		got, err := DecodeSound(readerAtBytes(data), k[0], k[1], nil)
+		if err != nil {
+			t.Fatalf("DecodeSound%v: %v", k, err)
+		}
+		if got.SampleRate != 22050 || len(got.PCM) != 2 {
+			t.Errorf("sound %v decoded wrongly: %+v", k, got)
+		}
+	}
+}
+
+func TestDocument_DuplicateKeysActOnTheFirstOne(t *testing.T) {
+	a, b := buildWAV(t, 1, 8000, 8, []byte{0x80}), buildWAV(t, 1, 8000, 8, []byte{0x81})
+	doc, err := ParseDocument(buildV1File(t, []v1TestEntry{
+		{group: 1, sample: 1, payload: a}, {group: 1, sample: 1, payload: b},
+	}))
+	if err != nil {
+		t.Fatalf("ParseDocument: %v", err)
+	}
+	repl := buildWAV(t, 1, 8000, 8, []byte{0x90, 0x91})
+	if err := doc.ReplaceSound(1, 1, repl); err != nil {
+		t.Fatalf("ReplaceSound: %v", err)
+	}
+	if first, _ := doc.Sound(0); !bytes.Equal(first.Payload, repl) {
+		t.Error("the first duplicate was not replaced")
+	}
+	if second, _ := doc.Sound(1); !bytes.Equal(second.Payload, b) {
+		t.Error("the second duplicate changed")
+	}
+	if err := doc.RemoveSound(1, 1); err != nil {
+		t.Fatalf("RemoveSound: %v", err)
+	}
+	if only, _ := doc.Sound(0); doc.Len() != 1 || !bytes.Equal(only.Payload, b) {
+		t.Error("removing should drop the first duplicate and keep the second")
+	}
+}

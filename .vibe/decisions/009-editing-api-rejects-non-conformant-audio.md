@@ -11,3 +11,5 @@ status: accepted
 **Reason:** The check reuses the decoder, so what the API accepts is exactly what the library can read back. Conversion needs a resampler and codecs, which the stdlib-only, playback-free design (CLAUDE.md constraints 1 and 2) rules out.
 
 **Rejected alternatives:** Converting to a canonical format on the way in (extra code and dependencies, lossy). Restricting sample rate or channel count (real files vary; the decoder does not care). Separate edit-by-index functions (a key is how consumers address sounds).
+
+**Amends:** decision `004` fixed the WASM surface at one global function; this decision extends it with `addSound`, `replaceSound` and `removeSound`. Review follow-up: the editing operations also refuse a key outside the signed 32-bit range, and the raw payload setter that bypassed the audio rule is no longer exported.

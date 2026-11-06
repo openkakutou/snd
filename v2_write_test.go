@@ -116,7 +116,10 @@ func TestEncodeV2_KeepsAnExplicitV2Stamp(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EncodeV2: %v", err)
 	}
-	back, _ := ReadV2Set(readerAtBytes(data))
+	back, err := ReadV2Set(readerAtBytes(data))
+	if err != nil {
+		t.Fatalf("ReadV2Set: %v", err)
+	}
 	if back.Version != [4]byte{2, 0, 1, 0} {
 		t.Errorf("Version = %v, want [2 0 1 0]", back.Version)
 	}
@@ -185,5 +188,28 @@ func TestReadV2Set_RejectsTruncatedFile(t *testing.T) {
 	data := readFixture(t, "v2-basic.snd")
 	if _, err := ReadV2Set(readerAtBytes(data[:len(data)-5])); err == nil {
 		t.Fatal("want an error for a file cut inside a payload, got nil")
+	}
+}
+
+func TestReadV2Set_KeepsMalformedEntriesAndEncodeV2RefusesThem(t *testing.T) {
+	data := buildV2File(t, []v1TestEntry{
+		{group: 1, sample: 1, payload: buildWAV(t, 1, 8000, 8, []byte{0x80})},
+		{group: 1, sample: 1, payload: []byte("junk junk junk junk")},
+	})
+	set, err := ReadV2Set(readerAtBytes(data))
+	if err != nil {
+		t.Fatalf("ReadV2Set: %v", err)
+	}
+	if len(set.Sounds) != 2 {
+		t.Fatalf("got %d sounds, want both kept", len(set.Sounds))
+	}
+	if _, err := EncodeV2(set); err == nil {
+		t.Fatal("EncodeV2 should refuse the duplicate key")
+	}
+}
+
+func TestReadV2Set_RejectsGarbage(t *testing.T) {
+	if _, err := ReadV2Set(readerAtBytes([]byte("garbage, not a real snd file at all"))); err == nil {
+		t.Fatal("want an error, got nil")
 	}
 }

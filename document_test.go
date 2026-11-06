@@ -113,7 +113,7 @@ func TestDocument_EditingOneSoundChangesOnlyThatSoundAndTheOffsetsAfterIt(t *tes
 		t.Fatalf("ParseDocument: %v", err)
 	}
 
-	if err := doc.SetPayload(1, []byte("B")); err != nil { // shrinks by 5 bytes
+	if err := doc.setPayload(1, []byte("B")); err != nil { // shrinks by 5 bytes
 		t.Fatalf("SetPayload: %v", err)
 	}
 	edited := serializeDoc(t, doc)
@@ -160,7 +160,7 @@ func TestDocument_GrowingAPayloadKeepsGapsAndTrailingBytes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseDocument: %v", err)
 	}
-	if err := doc.SetPayload(0, []byte("aaaaaaaa")); err != nil {
+	if err := doc.setPayload(0, []byte("aaaaaaaa")); err != nil {
 		t.Fatalf("SetPayload: %v", err)
 	}
 	out := serializeDoc(t, doc)
@@ -185,7 +185,7 @@ func TestDocument_SoundAndSetPayloadRejectBadIndexAndDoNotAlias(t *testing.T) {
 		if _, err := doc.Sound(i); err == nil {
 			t.Errorf("Sound(%d): want an error", i)
 		}
-		if err := doc.SetPayload(i, nil); err == nil {
+		if err := doc.setPayload(i, nil); err == nil {
 			t.Errorf("SetPayload(%d): want an error", i)
 		}
 	}
@@ -197,7 +197,7 @@ func TestDocument_SoundAndSetPayloadRejectBadIndexAndDoNotAlias(t *testing.T) {
 		t.Error("Sound returned the document's own bytes: editing the copy changed the document")
 	}
 	payload := []byte("xy")
-	_ = doc.SetPayload(0, payload)
+	_ = doc.setPayload(0, payload)
 	payload[0] = 'Z'
 	if got, _ := doc.Sound(0); string(got.Payload) != "xy" {
 		t.Errorf("SetPayload kept the caller's slice: payload now %q", got.Payload)
@@ -250,8 +250,7 @@ func TestParseDocument_RejectsMalformedFiles(t *testing.T) {
 func TestDocument_CorpusFilesRoundTripByteIdentical(t *testing.T) {
 	dir := os.Getenv("SND_CORPUS_DIR")
 	if dir == "" {
-		t.Log("SND_CORPUS_DIR not set: no real-file corpus to check")
-		return
+		t.Skip("SND_CORPUS_DIR not set: no real-file corpus to check")
 	}
 
 	checked := 0
@@ -276,6 +275,9 @@ func TestDocument_CorpusFilesRoundTripByteIdentical(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("walking %s: %v", dir, err)
+	}
+	if checked == 0 {
+		t.Fatalf("no readable .snd file found under %s", dir)
 	}
 	t.Logf("%d real files round-tripped byte-identical", checked)
 }

@@ -228,8 +228,7 @@ func TestReadV1Set_RejectsMalformedInput(t *testing.T) {
 func TestEncodeV1_CorpusFilesReEncodeByteIdentical(t *testing.T) {
 	dir := os.Getenv("SND_CORPUS_DIR")
 	if dir == "" {
-		t.Log("SND_CORPUS_DIR not set: no real-file corpus to check")
-		return
+		t.Skip("SND_CORPUS_DIR not set: no real-file corpus to check")
 	}
 
 	checked := 0
@@ -259,5 +258,31 @@ func TestEncodeV1_CorpusFilesReEncodeByteIdentical(t *testing.T) {
 	if err != nil {
 		t.Fatalf("walking %s: %v", dir, err)
 	}
+	if checked == 0 {
+		t.Fatalf("no readable .snd file found under %s", dir)
+	}
 	t.Logf("%d real files re-encoded byte-identical", checked)
+}
+
+func TestEncodeV1_VendoredFixturesReEncodeWithOnlyTheLastPointerNormalized(t *testing.T) {
+	for _, name := range []string{"v1-basic.snd", "v1-8bit.snd", "v1-multidigit-sample.snd"} {
+		t.Run(name, func(t *testing.T) {
+			data := readFixture(t, name)
+			set, err := ReadV1Set(readerAtBytes(data))
+			if err != nil {
+				t.Fatalf("ReadV1Set: %v", err)
+			}
+			got, err := EncodeV1(set)
+			if err != nil {
+				t.Fatalf("EncodeV1: %v", err)
+			}
+			// Fixtures end with a zero last pointer; EncodeV1 writes the
+			// end-of-file pointer real files have. Nothing else differs.
+			want := append([]byte{}, data...)
+			binary.LittleEndian.PutUint32(want[24:28], uint32(len(want)))
+			if !bytes.Equal(got, want) {
+				t.Fatal("re-encoded fixture differs beyond the last pointer")
+			}
+		})
+	}
 }

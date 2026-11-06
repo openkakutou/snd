@@ -37,7 +37,7 @@ type V2SoundSet struct {
 
 // ReadV2Set reads a whole .snd v2 file into memory without decoding any
 // audio. A payload is read as an external reference when it looks like one
-// (the same rule DecodeV2Sound applies), and as embedded audio otherwise.
+// (the rule DecodeV2Sound uses, classifyV2Payload), and as embedded audio otherwise.
 // Unlike EncodeV2, it keeps entries as they are, malformed ones included.
 func ReadV2Set(r io.ReaderAt) (*V2SoundSet, error) {
 	table, err := ParseV2(r)
@@ -61,7 +61,7 @@ func ReadV2Set(r io.ReaderAt) (*V2SoundSet, error) {
 	}
 	for i, e := range entries {
 		sound := V2Sound{Group: e.Group, Sample: e.Sample}
-		if path, ok := externalFileReferencePath(payloads[i]); ok && !isEmbeddedRIFFWAVE(payloads[i]) {
+		if path, ok := classifyV2Payload(payloads[i]); ok {
 			sound.ExternalPath = path
 		} else {
 			sound.Audio = payloads[i]

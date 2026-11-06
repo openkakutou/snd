@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Adding a sound with a group or sample number too large for the file format is now refused with a clear error. Before, the number was silently cut down when saving, which could create a second sound under a number that already existed.
+- The WebAssembly build now accepts an external audio file returned as a Node `Buffer`, not only as a plain byte array.
+
 ## [0.7.0] - 2026-11-06
 
 ### Added

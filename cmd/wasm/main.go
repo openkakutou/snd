@@ -132,7 +132,7 @@ func externalOpenerFromJS(args []js.Value) (snd.ExternalAudioOpener, error) {
 		}()
 
 		v := fn.Invoke(path)
-		if v.Type() != js.TypeObject || v.Get("constructor").Get("name").String() != "Uint8Array" {
+		if v.Type() != js.TypeObject || !v.InstanceOf(js.Global().Get("Uint8Array")) {
 			return nil, fmt.Errorf("resolveExternal(%q): expected a synchronous Uint8Array return value, got %v (an async/Promise-returning resolveExternal is not supported)", path, v)
 		}
 		return bytesFromJS(v)

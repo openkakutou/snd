@@ -131,16 +131,46 @@ type containerPayload struct {
 	Payload       []byte
 }
 
+// checkSoundKey refuses a (group, sample) key the format cannot store: both
+// are signed 32-bit fields on disk.
+func checkSoundKey(group, sample int) error {
+	if group < math.MinInt32 || group > math.MaxInt32 {
+		return fmt.Errorf("group %d is outside the signed 32-bit range", group)
+	}
+	if sample < math.MinInt32 || sample > math.MaxInt32 {
+		return fmt.Errorf("sample %d (group %d) is outside the signed 32-bit range", sample, group)
+	}
+	return nil
+}
+
+// putHeader builds the 24-byte file header.
+func putHeader(version [4]byte, soundCount int, firstSubheader uint32) []byte {
+	header := make([]byte, v1HeaderFieldsSize)
+	copy(header[0:12], v1Signature)
+	copy(header[12:16], version[:])
+	binary.LittleEndian.PutUint32(header[16:20], uint32(soundCount))
+	binary.LittleEndian.PutUint32(header[20:24], firstSubheader)
+	return header
+}
+
+// putSubheader builds one sound's 16-byte subheader. The key must already
+// have passed checkSoundKey.
+func putSubheader(next, length uint32, group, sample int) []byte {
+	sub := make([]byte, v1SoundSubheaderSize)
+	binary.LittleEndian.PutUint32(sub[0:4], next)
+	binary.LittleEndian.PutUint32(sub[4:8], length)
+	binary.LittleEndian.PutUint32(sub[8:12], uint32(int32(group)))
+	binary.LittleEndian.PutUint32(sub[12:16], uint32(int32(sample)))
+	return sub
+}
+
 // encodeContainer writes the header, padding and contiguous sound table
 // shared by v1 and v2 files.
 func encodeContainer(version [4]byte, padding []byte, sounds []containerPayload) ([]byte, error) {
 	total := int64(v1HeaderFieldsSize) + int64(len(padding))
 	for i, s := range sounds {
-		if s.Group < math.MinInt32 || s.Group > math.MaxInt32 {
-			return nil, fmt.Errorf("snd: sound %d has group %d outside the signed 32-bit range", i, s.Group)
-		}
-		if s.Sample < math.MinInt32 || s.Sample > math.MaxInt32 {
-			return nil, fmt.Errorf("snd: sound %d (group %d) has sample %d outside the signed 32-bit range", i, s.Group, s.Sample)
+		if err := checkSoundKey(s.Group, s.Sample); err != nil {
+			return nil, fmt.Errorf("snd: sound %d: %w", i, err)
 		}
 		total += v1SoundSubheaderSize + int64(len(s.Payload))
 		if total > math.MaxUint32 {
@@ -149,23 +179,12 @@ func encodeContainer(version [4]byte, padding []byte, sounds []containerPayload)
 	}
 
 	out := make([]byte, 0, total)
-
-	header := make([]byte, v1HeaderFieldsSize)
-	copy(header[0:12], v1Signature)
-	copy(header[12:16], version[:])
-	binary.LittleEndian.PutUint32(header[16:20], uint32(len(sounds)))
-	binary.LittleEndian.PutUint32(header[20:24], uint32(v1HeaderFieldsSize+len(padding)))
-	out = append(out, header...)
+	out = append(out, putHeader(version, len(sounds), uint32(v1HeaderFieldsSize+len(padding)))...)
 	out = append(out, padding...)
 
 	for _, s := range sounds {
 		next := int64(len(out)) + v1SoundSubheaderSize + int64(len(s.Payload))
-		sub := make([]byte, v1SoundSubheaderSize)
-		binary.LittleEndian.PutUint32(sub[0:4], uint32(next))
-		binary.LittleEndian.PutUint32(sub[4:8], uint32(len(s.Payload)))
-		binary.LittleEndian.PutUint32(sub[8:12], uint32(int32(s.Group)))
-		binary.LittleEndian.PutUint32(sub[12:16], uint32(int32(s.Sample)))
-		out = append(out, sub...)
+		out = append(out, putSubheader(uint32(next), uint32(len(s.Payload)), s.Group, s.Sample)...)
 		out = append(out, s.Payload...)
 	}
 

@@ -42,6 +42,9 @@ func (d *Document) AddSound(group, sample int, wav []byte) error {
 	if err := validateNewAudio(wav); err != nil {
 		return fmt.Errorf("adding sound (group %d, sample %d): %w", group, sample, err)
 	}
+	if err := checkSoundKey(group, sample); err != nil {
+		return fmt.Errorf("snd: adding sound: %w", err)
+	}
 	if _, exists := d.Find(group, sample); exists {
 		return fmt.Errorf("snd: sound (group %d, sample %d) already exists", group, sample)
 	}
@@ -67,7 +70,7 @@ func (d *Document) ReplaceSound(group, sample int, wav []byte) error {
 	if !ok {
 		return fmt.Errorf("snd: no sound (group %d, sample %d) to replace", group, sample)
 	}
-	return d.SetPayload(i, wav)
+	return d.setPayload(i, wav)
 }
 
 // RemoveSound removes the sound with the given key. It fails when no sound

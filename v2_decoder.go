@@ -51,11 +51,7 @@ func DecodeV2Sound(r io.ReaderAt, table *V2SoundTable, group, sample int, openEx
 		return nil, fmt.Errorf("snd: sound (group %d, sample %d): reading %d bytes of payload: %w", group, sample, entry.Length, err)
 	}
 
-	if isEmbeddedRIFFWAVE(blob) {
-		return decodeWAVPCM(blob, group, sample)
-	}
-
-	path, isExternal := externalFileReferencePath(blob)
+	path, isExternal := classifyV2Payload(blob)
 	if !isExternal {
 		// Neither a valid RIFF/WAVE blob nor a plausible external path:
 		// genuinely corrupt/malformed embedded data, same as v1's own
@@ -111,4 +107,15 @@ func externalFileReferencePath(blob []byte) (string, bool) {
 		return "", false
 	}
 	return path, true
+}
+
+// classifyV2Payload says whether a v2 payload is an Ikemen GO external-file
+// reference, and if so its path. An embedded RIFF/WAVE blob always wins
+// over the path heuristic. DecodeV2Sound and ReadV2Set both go through it,
+// so reading a file and decoding it agree on what each entry is.
+func classifyV2Payload(blob []byte) (path string, isExternal bool) {
+	if isEmbeddedRIFFWAVE(blob) {
+		return "", false
+	}
+	return externalFileReferencePath(blob)
 }
