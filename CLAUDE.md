@@ -24,6 +24,10 @@ This repo is a **shared, domain-independent dependency** of the OpenKakutou org 
 
 Compatibility target (org-wide convention, same bar as every other parser): MUGEN 1.0/1.1 **and** Ikemen GO, validated against real community files — not just the spec. Includes Ikemen GO's own `.snd` v2 extension letting a sound entry point at an external audio file instead of embedding samples.
 
+## Compatibility target (MUST) <!-- keep -->
+
+Every feature and fix touching MUGEN/Ikemen GO formats or behavior must be compatible with **both MUGEN 1.0/1.1 and Ikemen GO**, extensions included, and validated against real community files — never MUGEN-only, never from memory. Where the two engines diverge, record the divergence and the chosen behavior in an ADR, and ground engine-behavior claims in a source (fixture, doc, engine source), marking anything unverified. This is an org-wide rule (`roadmap/repos.md`), already settled: do not ask the user whether it applies, and carry it as a 🔒 MUST in every need framing, implementer prompt and review.
+
 ## Design constraints <!-- keep -->
 
 1. **No playback dependency.** This module only parses `.snd` files and decodes to raw PCM — no `AudioContext`, no SDL2_mixer, nothing playback-related. It must compile cleanly to WASM and be usable as-is by libraries (`character`) and web/native apps (via WASM or direct Go import).
