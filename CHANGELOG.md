@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-11-17
+
 ### Security
 
 - A malformed or hostile sound file can no longer exhaust memory (for example in a browser): sizes a file announces are never trusted beyond what it actually contains, and a sound table that loops back on itself is refused with a clear error. Real MUGEN and Ikemen GO files read exactly as before.
@@ -66,7 +68,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Read a `.snd` v1 file's header and sound table, keyed by `(group, sample)`, and decode each entry's embedded audio to raw PCM samples. Malformed headers or truncated sample data return a descriptive error naming the offending entry instead of panicking or producing silently wrong audio. Validated against real, unmodified community `.snd` files. ADPCM-encoded entries are not supported — real files and Ikemen GO's own reference sound loader only ever use plain PCM, so this is a documented, permanent scope cut rather than unverifiable speculative code.
 
-[Unreleased]: https://github.com/openkakutou/snd/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/openkakutou/snd/compare/v0.7.2...HEAD
+[0.7.2]: https://github.com/openkakutou/snd/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/openkakutou/snd/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/openkakutou/snd/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/openkakutou/snd/compare/v0.5.0...v0.6.0
