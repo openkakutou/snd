@@ -2,6 +2,7 @@ package snd
 
 import (
 	"encoding/binary"
+	"strings"
 	"testing"
 )
 
@@ -174,5 +175,60 @@ func TestDecodeV1Sound_ReturnsError_OnTruncatedSampleData(t *testing.T) {
 	_, err = DecodeV1Sound(readerAtBytes(truncated), table, 0, 0)
 	if err == nil {
 		t.Fatal("DecodeV1Sound: expected an error for truncated sample data, got nil")
+	}
+}
+
+func TestDecodeV1Sound_AllocatesLittle_WhenDeclaredLengthExceedsFile(t *testing.T) {
+	data := append(rawSndHeader(1, 1, 24), rawSubheader(0, 0xFFFFFFF0, 1, 1)...)
+	table, err := ParseV1(readerAtBytes(data))
+	if err != nil {
+		t.Fatalf("ParseV1: %v", err)
+	}
+	var decErr error
+	got := allocatedBytes(func() { _, decErr = DecodeV1Sound(readerAtBytes(data), table, 1, 1) })
+	if decErr == nil || !strings.Contains(decErr.Error(), "group 1, sample 1") {
+		t.Fatalf("err = %v; want an error naming (group 1, sample 1)", decErr)
+	}
+	if got > 1<<20 {
+		t.Errorf("DecodeV1Sound allocated %d bytes for a %d-byte file; want <= 1 MiB", got, len(data))
+	}
+}
+
+// wavChunk builds one RIFF chunk header (id + declared size) followed by body.
+func wavChunk(id string, declared uint32, body []byte) []byte {
+	return append(appendUint32([]byte(id), declared), body...)
+}
+
+// wavBlobCases are hand-built malformed RIFF/WAVE blobs, each with the error
+// text decodeWAVPCM must produce.
+func wavBlobCases() map[string]struct {
+	blob []byte
+	want string
+} {
+	riff := func(chunks ...[]byte) []byte {
+		b := []byte("RIFF\x00\x00\x00\x00WAVE")
+		for _, c := range chunks {
+			b = append(b, c...)
+		}
+		return b
+	}
+	fmt16 := wavChunk("fmt ", 16, make([]byte, 16))
+	return map[string]struct {
+		blob []byte
+		want string
+	}{
+		"data-chunk-declares-more-than-present": {riff(wavChunk("data", 0xFFFFFFF0, []byte{1, 2})), `truncated "data" chunk`},
+		"no-fmt-chunk":                          {riff(wavChunk("data", 2, []byte{1, 2})), "missing fmt chunk"},
+		"fmt-chunk-shorter-than-16-bytes":       {riff(wavChunk("fmt ", 8, make([]byte, 8)), wavChunk("data", 2, []byte{1, 2})), "fmt chunk too short (8 bytes)"},
+		"no-data-chunk":                         {riff(fmt16), "missing data chunk"},
+	}
+}
+
+func TestDecodeWAVPCM_ReturnsSpecificError_ForMalformedChunks(t *testing.T) {
+	for name, c := range wavBlobCases() {
+		_, err := decodeWAVPCM(c.blob, 1, 1)
+		if err == nil || !strings.Contains(err.Error(), c.want) {
+			t.Errorf("%s: err = %v; want it to contain %q", name, err, c.want)
+		}
 	}
 }

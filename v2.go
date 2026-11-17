@@ -90,13 +90,18 @@ func ParseV2(r io.ReaderAt) (*V2SoundTable, error) {
 
 	table := &V2SoundTable{
 		Header: h,
-		Sounds: make([]V2SoundEntry, 0, h.NumberOfSounds),
 	}
 
+	seen := make(map[int64]bool)
 	for i := 0; i < h.NumberOfSounds; i++ {
 		if nextOffset == 0 {
 			return nil, fmt.Errorf("snd: v2 sound table ended after %d of %d declared sounds", i, h.NumberOfSounds)
 		}
+
+		if seen[nextOffset] {
+			return nil, fmt.Errorf("snd: v2 sound table has a cycle: next pointer revisits offset %d", nextOffset)
+		}
+		seen[nextOffset] = true
 
 		sub := make([]byte, v2SoundSubheaderSize)
 		if _, err := r.ReadAt(sub, nextOffset); err != nil {

@@ -1,7 +1,9 @@
 package snd
 
 import (
+	"bytes"
 	"encoding/binary"
+	"strings"
 	"testing"
 )
 
@@ -133,4 +135,65 @@ func TestParseV2_ReturnsError_OnNegativeSoundCount(t *testing.T) {
 	if err == nil {
 		t.Fatal("ParseV2: expected an error for a negative declared sound count, got nil")
 	}
+}
+
+func TestParseV2_AllocatesLittle_WhenHeaderDeclaresHugeSoundCount(t *testing.T) {
+	data := hostileTables(2)["huge-count"]
+	var err error
+	got := allocatedBytes(func() { _, err = ParseV2(bytes.NewReader(data)) })
+	if err == nil {
+		t.Fatal("ParseV2 returned nil error for a table ending after 1 of 16777216 sounds")
+	}
+	if !strings.Contains(err.Error(), "1 of 16777216") {
+		t.Errorf("err = %v; want it to name the declared count (1 of 16777216)", err)
+	}
+	if got > 1<<20 {
+		t.Errorf("ParseV2 allocated %d bytes for a %d-byte file; want <= 1 MiB", got, len(data))
+	}
+}
+
+func TestParseV2_ReturnsErrorNamingOffset_WhenNextPointerCycles(t *testing.T) {
+	for _, name := range []string{"self-pointer", "two-cycle"} {
+		_, err := ParseV2(bytes.NewReader(hostileTables(2)[name]))
+		if err == nil || !strings.Contains(err.Error(), "cycle") || !strings.Contains(err.Error(), "offset 24") {
+			t.Errorf("%s: err = %v; want a cycle error naming offset 24", name, err)
+		}
+	}
+}
+
+func TestParseV2_AcceptsBackwardPointer_WhenChainDoesNotRepeat(t *testing.T) {
+	// Second subheader sits before the first: pointer direction is not
+	// constrained, only revisiting an offset is.
+	data := append(rawSndHeader(2, 2, 40), rawSubheader(0, 0, 1, 2)...)
+	data = append(data, rawSubheader(24, 0, 1, 1)...)
+	table, err := ParseV2(bytes.NewReader(data))
+	if err != nil {
+		t.Fatalf("ParseV2: %v", err)
+	}
+	if len(table.Sounds) != 2 || table.Sounds[0].Sample != 1 || table.Sounds[1].Sample != 2 {
+		t.Errorf("Sounds = %+v; want samples 1 then 2", table.Sounds)
+	}
+}
+
+func FuzzParseV2(f *testing.F) {
+	for _, name := range []string{"v2-basic.snd", "v2-external-ref.snd"} {
+		f.Add(readSeed(f, name))
+	}
+	for _, d := range hostileTables(2) {
+		f.Add(d)
+	}
+	f.Fuzz(func(t *testing.T, data []byte) {
+		table, err := ParseV2(bytes.NewReader(data))
+		if err != nil {
+			return
+		}
+		if len(table.Sounds) != table.Header.NumberOfSounds {
+			t.Fatalf("parsed %d sounds, header declares %d", len(table.Sounds), table.Header.NumberOfSounds)
+		}
+		for _, e := range table.Sounds {
+			if e.Offset > int64(len(data)) {
+				t.Fatalf("entry %+v starts beyond the %d-byte input", e, len(data))
+			}
+		}
+	})
 }

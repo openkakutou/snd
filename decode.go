@@ -74,3 +74,18 @@ func detectVersion(r io.ReaderAt) (isV2 bool, err error) {
 	}
 	return peek[12] == 2, nil
 }
+
+// readBlob reads exactly length bytes at offset. It never allocates from the
+// declared length: the buffer grows only with bytes the file really holds, so
+// a hostile length cannot exhaust memory, and a file holding fewer bytes
+// yields io.ErrUnexpectedEOF.
+func readBlob(r io.ReaderAt, offset int64, length int) ([]byte, error) {
+	blob, err := io.ReadAll(io.NewSectionReader(r, offset, int64(length)))
+	if err != nil {
+		return nil, err
+	}
+	if len(blob) < length {
+		return nil, io.ErrUnexpectedEOF
+	}
+	return blob, nil
+}

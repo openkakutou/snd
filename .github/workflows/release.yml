@@ -31,6 +31,41 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+      # Short fuzzing pass before publishing (one target per invocation, as
+      # Go requires). See .vibe/decisions/010-declared-sizes-bounded-by-file-content.md.
+      - name: Fuzz ParseV1
+        run: go test -run='^$' -fuzz='^FuzzParseV1$' -fuzztime=20s .
+
+      - name: Upload ParseV1 fuzz corpus on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: fuzz-failure-ParseV1
+          path: testdata/fuzz
+          if-no-files-found: ignore
+
+      - name: Fuzz ParseV2
+        run: go test -run='^$' -fuzz='^FuzzParseV2$' -fuzztime=20s .
+
+      - name: Upload ParseV2 fuzz corpus on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: fuzz-failure-ParseV2
+          path: testdata/fuzz
+          if-no-files-found: ignore
+
+      - name: Fuzz DecodeSound
+        run: go test -run='^$' -fuzz='^FuzzDecodeSound$' -fuzztime=20s .
+
+      - name: Upload DecodeSound fuzz corpus on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: fuzz-failure-DecodeSound
+          path: testdata/fuzz
+          if-no-files-found: ignore
+
       - name: Build WASM module
         run: GOOS=js GOARCH=wasm go build -o snd.wasm ./cmd/wasm
 

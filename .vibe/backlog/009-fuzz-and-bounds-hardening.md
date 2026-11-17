@@ -1,5 +1,5 @@
 ---
-status: todo
+status: in_progress
 ---
 # Fuzz and bound-check the decoders
 

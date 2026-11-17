@@ -39,8 +39,8 @@ func DecodeV1Sound(r io.ReaderAt, table *V1SoundTable, group, sample int) (*Deco
 	}
 	entry := table.Sounds[i]
 
-	blob := make([]byte, entry.Length)
-	if _, err := r.ReadAt(blob, entry.Offset); err != nil {
+	blob, err := readBlob(r, entry.Offset, entry.Length)
+	if err != nil {
 		return nil, fmt.Errorf("snd: sound (group %d, sample %d): reading %d bytes of audio data: %w", group, sample, entry.Length, err)
 	}
 

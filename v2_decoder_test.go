@@ -2,6 +2,7 @@ package snd
 
 import (
 	"encoding/binary"
+	"strings"
 	"testing"
 )
 
@@ -133,5 +134,21 @@ func TestDecodeV2Sound_ReturnsError_WhenBlobIsCorruptGarbage_NotAPathAndNotRIFFW
 	_, err = DecodeV2Sound(readerAtBytes(data), table, 0, 0, nil)
 	if err == nil {
 		t.Fatal("DecodeV2Sound: expected an error for corrupt, non-path garbage data, got nil")
+	}
+}
+
+func TestDecodeV2Sound_AllocatesLittle_WhenDeclaredLengthExceedsFile(t *testing.T) {
+	data := append(rawSndHeader(2, 1, 24), rawSubheader(0, 0xFFFFFFF0, 1, 1)...)
+	table, err := ParseV2(readerAtBytes(data))
+	if err != nil {
+		t.Fatalf("ParseV2: %v", err)
+	}
+	var decErr error
+	got := allocatedBytes(func() { _, decErr = DecodeV2Sound(readerAtBytes(data), table, 1, 1, nil) })
+	if decErr == nil || !strings.Contains(decErr.Error(), "group 1, sample 1") {
+		t.Fatalf("err = %v; want an error naming (group 1, sample 1)", decErr)
+	}
+	if got > 1<<20 {
+		t.Errorf("DecodeV2Sound allocated %d bytes for a %d-byte file; want <= 1 MiB", got, len(data))
 	}
 }

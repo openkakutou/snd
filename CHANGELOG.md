@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- A malformed or hostile sound file can no longer exhaust memory (for example in a browser): sizes a file announces are never trusted beyond what it actually contains, and a sound table that loops back on itself is refused with a clear error. Real MUGEN and Ikemen GO files read exactly as before.
+
 ## [0.7.1] - 2026-11-06
 
 ### Fixed
