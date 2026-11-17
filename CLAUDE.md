@@ -5,7 +5,7 @@
 
 ## Project overview
 
-OpenKakutou `snd` is a read/write Go library for MUGEN/Ikemen GO sound (`.snd`) files: v1 and v2 parsing and decoding to raw PCM. It is extracted as its own repo from the start (see the roadmap's decision `026-scope-org-wide-audio-snd-and-bgm-support`) because two independent consumers need it: [`character`](https://github.com/openkakutou/character) (a character's own hit/voice/taunt sounds) and [`mode-quick-versus`](https://github.com/openkakutou/mode-quick-versus) directly (system/common sound sets not tied to any one character). It has no playback dependency and must compile cleanly to WebAssembly.
+OpenKakutou `snd` is a read/write Go library for MUGEN/Ikemen GO sound (`.snd`) files: v1 and v2 parsing and decoding to raw PCM. It is extracted as its own repo from the start (see the roadmap's decision `026-scope-org-wide-audio-snd-and-bgm-support`) because two independent consumers need it: [`character`](https://github.com/openkakutou/character) (a character's own hit/voice/taunt sounds) and [`game`](https://github.com/openkakutou/game) directly (system/common sound sets not tied to any one character). It has no playback dependency and must compile cleanly to WebAssembly.
 
 **Stack:** Go 1.26, stdlib-only, compiled to WASM (`GOOS=js GOARCH=wasm`) for browser consumers. No UI code, no audio playback code lives in this repo.
 **Type:** library
@@ -19,7 +19,7 @@ English — all documentation, backlog items, code comments, and other generated
 This repo is a **shared, domain-independent dependency** of the OpenKakutou org (github.com/openkakutou) — it belongs to no single domain, mirroring [`sff`](https://github.com/openkakutou/sff)'s own shape and role. Its consumers:
 
 - `character` — depends on it (Go module) to decode a character's own `SoundFile` and expose its samples via the WASM `load`/`LoadBytes` contract (see `character`'s backlog item 057)
-- `mode-quick-versus` — depends on it (via the WASM build) directly, for system/common sound sets that aren't part of any character's own files, and to actually play back both those and `engine`-triggered character sounds (see `mode-quick-versus`'s backlog item 013)
+- `game` — depends on it (via the WASM build) directly, for system/common sound sets that aren't part of any character's own files, and to actually play back both those and `engine`-triggered character sounds (see `game`'s backlog item 013)
 - `engine` never depends on this repo — it only triggers `PlaySnd` as an event (`(group, sample)`), never decodes or plays audio itself (see `engine`'s backlog item 020 and roadmap decision `004`/`008`, which scope `engine` to simulation, not rendering/asset decode)
 
 Compatibility target (org-wide convention, same bar as every other parser): MUGEN 1.0/1.1 **and** Ikemen GO, validated against real community files — not just the spec. Includes Ikemen GO's own `.snd` v2 extension letting a sound entry point at an external audio file instead of embedding samples.

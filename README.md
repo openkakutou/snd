@@ -1,6 +1,6 @@
 # snd
 
-A read/write Go library for MUGEN/Ikemen GO sound (`.snd`) files — v1 and v2 parsing and decoding to raw PCM — a shared dependency of the [OpenKakutou](https://github.com/openkakutou) project, needed independently by [`character`](https://github.com/openkakutou/character) (a character's own sounds) and [`mode-quick-versus`](https://github.com/openkakutou/mode-quick-versus) (system/common sound sets). No playback dependency; compiles to WebAssembly.
+A read/write Go library for MUGEN/Ikemen GO sound (`.snd`) files — v1 and v2 parsing and decoding to raw PCM — a shared dependency of the [OpenKakutou](https://github.com/openkakutou) project, needed independently by [`character`](https://github.com/openkakutou/character) (a character's own sounds) and [`game`](https://github.com/openkakutou/game) (system/common sound sets). No playback dependency; compiles to WebAssembly.
 
 <!-- vibe:begin:features -->
 - Read a `.snd` v1 or v2 sound file's header and sound table, addressed the same way a character's own sound-triggering controller addresses sounds

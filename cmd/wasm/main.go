@@ -3,7 +3,7 @@
 // Command wasm is the WASM entrypoint for the snd library: thin syscall/js
 // glue exposing this package's version-agnostic DecodeSound to a browser
 // (or any JS host) as a single JS-callable global function, so a consumer
-// (mode-quick-versus, for system/common sound sets not routed through any
+// (game, for system/common sound sets not routed through any
 // one character) can decode a MUGEN/Ikemen GO .snd sound file without a Go
 // toolchain of its own — independent of character's own WASM build, which
 // consumes this same package internally but publishes its own artifact.
@@ -65,7 +65,7 @@ func decode(this js.Value, args []js.Value) (result any) {
 	defer func() {
 		// A panic here would otherwise propagate out of the js.Func
 		// callback and tear down the whole page's WASM instance —
-		// mode-quick-versus keeps one instance alive for a whole session
+		// game keeps one instance alive for a whole session
 		// and calls decode repeatedly, so this boundary's own recovery
 		// must never let one bad call break every call after it.
 		if r := recover(); r != nil {
